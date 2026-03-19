@@ -36,10 +36,14 @@ The following decisions are accepted for now and should be treated as the defaul
 
 - Host execution style: Docker Compose on Linux
 - Container base OS: Ubuntu 22.04
-- Autopilot: PX4 SITL
+- Autopilot: PX4-Autopilot `v1.16.0` in SITL mode
 - ROS distribution: ROS 2 Humble
 - Simulator: Gazebo Harmonic
 - Ground-control side channel: MAVLink retained for QGroundControl, debugging, and fallback tooling
+
+These pins are based on current official PX4, ROS, and Gazebo documentation as of `2026-03-19`.
+
+Gazebo Harmonic with ROS 2 Humble is being chosen intentionally. It is a supported PX4 path, but it is not Gazebo's default ROS pairing, so it carries some integration risk around package and bridge setup.
 
 ### Integration Boundaries
 
@@ -54,6 +58,14 @@ The following decisions are accepted for now and should be treated as the defaul
 - Existing PX4 fixed-wing model before custom airframe work
 - Documentation and guardrails before implementation
 - Agent work must be scoped to narrow, reviewable tasks
+
+### Phase 1 Base Model
+
+- Phase-1 base airframe: PX4 `gz_rc_cessna`
+
+This is the standard fixed-wing model documented in PX4 `v1.16` and is also used in PX4's multi-vehicle Gazebo + ROS 2 example, which makes it the safest starting point for future swarm work.
+
+`gz_advanced_plane` is intentionally deferred until after the baseline stack is working because it adds lift-model complexity that is not needed for phase 1.
 
 ## Control Contract for Phase 1
 
@@ -130,13 +142,11 @@ These should require deliberate review even if an agent prepares the patch.
 
 The following items are intentionally left open, but must be resolved before phase-1 implementation:
 
-1. Exact PX4 version pin
-2. Exact Gazebo Harmonic installation and image strategy
-3. Exact base fixed-wing model to extend
-4. Exact phase-1 command primitive
-5. Exact topic, namespace, frame, and port naming convention
-6. Exact `uXRCE-DDS` topology for future multi-vehicle expansion
-7. Exact remote CI runner model and smoke-test execution shape
+1. Exact Gazebo Harmonic installation and image strategy
+2. Exact phase-1 command primitive
+3. Exact topic, namespace, frame, and port naming convention
+4. Exact `uXRCE-DDS` topology for future multi-vehicle expansion
+5. Exact remote CI runner model and smoke-test execution shape
 
 ## Proposed Repository Shape
 
