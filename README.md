@@ -7,6 +7,8 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 ## Start Here
 
 - [Phase 0 Baseline](./docs/phase-0-baseline.md)
+- [Agent Rules](./AGENTS.md)
+- [Task Template](./docs/task-template.md)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Phase 0 Goal
@@ -15,8 +17,8 @@ Freeze the minimum set of architectural decisions required to let future coding 
 
 ## Immediate Next Outcome
 
-After phase 0, the next work should be:
+With phase-0 decisions and guardrails in place, the next work should be:
 
-1. create `AGENTS.md` and task templates,
-2. create the initial repository layout for simulation and ROS work,
-3. implement a single-vehicle smoke-test target only.
+1. implement the canonical phase-1 Compose stack and image skeleton,
+2. add the first self-hosted CI workflow and smoke-test script,
+3. implement the single-vehicle smoke-test target only.
