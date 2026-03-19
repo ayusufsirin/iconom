@@ -91,6 +91,22 @@ Phase 1 does not include:
 
 This is deliberate. In PX4 `v1.16`, the documented ROS 2 control examples are centered on `VehicleCommand` and multicopter-style offboard flows, while the more explicit fixed-wing ROS 2 control interface comes later. Phase 1 should not depend on fixed-wing offboard semantics.
 
+## Naming and Port Conventions
+
+Phase-1 single-vehicle namespace: `plane_01`
+
+Future multi-vehicle pattern: `plane_01`, `plane_02`, `plane_03`, ...
+
+PX4 ROS topics must be namespaced through `PX4_UXRCE_DDS_NS`, producing topic paths such as `/plane_01/fmu/in/...` and `/plane_01/fmu/out/...`.
+
+Gazebo sensor topics and camera frames must use the same vehicle namespace prefix.
+
+MAVLink offboard API ports follow PX4's sequential multi-vehicle convention starting at `14540`, while GCS traffic remains on `14550`.
+
+The shared Micro XRCE-DDS Agent listens on UDP `8888` for all simulated vehicles in this project.
+
+These choices align with PX4 multi-vehicle conventions while using a project-specific namespace instead of the default `px4_N` pattern.
+
 ## Swarm Rules to Preserve From Day One
 
 Even though phase 1 is single-vehicle, the layout must not block later multi-vehicle work.
@@ -147,9 +163,8 @@ These should require deliberate review even if an agent prepares the patch.
 The following items are intentionally left open, but must be resolved before phase-1 implementation:
 
 1. Exact Gazebo Harmonic installation and image strategy
-2. Exact topic, namespace, frame, and port naming convention
-3. Exact `uXRCE-DDS` topology for future multi-vehicle expansion
-4. Exact remote CI runner model and smoke-test execution shape
+2. Exact `uXRCE-DDS` topology for future multi-vehicle expansion
+3. Exact remote CI runner model and smoke-test execution shape
 
 ## Proposed Repository Shape
 
