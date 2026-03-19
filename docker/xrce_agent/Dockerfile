@@ -30,9 +30,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/microxrce /opt/microxrce
+COPY --from=builder /usr/local/lib/ /usr/local/lib/
 COPY docker/xrce_agent/entrypoint.sh /usr/local/bin/xrce-agent-entrypoint.sh
 
-RUN chmod +x /usr/local/bin/xrce-agent-entrypoint.sh
+RUN printf '%s\n%s\n' "/opt/microxrce/lib" "/usr/local/lib" > /etc/ld.so.conf.d/microxrce.conf \
+ && ldconfig \
+ && chmod +x /usr/local/bin/xrce-agent-entrypoint.sh
 
 ENV XRCE_AGENT_UDP_PORT=8888
 

@@ -14,6 +14,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     sudo \
     wget \
+ && curl -sSL http://packages.osrfoundation.org/gazebo.key \
+    | gpg --dearmor -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(. /etc/os-release && echo ${UBUNTU_CODENAME}) main" \
+    > /etc/apt/sources.list.d/gazebo-stable.list \
+ && apt-get update && apt-get install -y --no-install-recommends \
+    gz-harmonic \
+    libopencv-dev \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt
@@ -32,6 +39,7 @@ RUN chmod +x /usr/local/bin/px4-entrypoint.sh /usr/local/bin/px4-run-single-vehi
 
 ENV PX4_HOME=/opt/PX4-Autopilot
 ENV PX4_GIT_REF=v1.16.0
+ENV GZ_VERSION=harmonic
 ENV PX4_HEADLESS=1
 ENV PX4_SYS_AUTOSTART=4003
 ENV PX4_GZ_WORLD=default
