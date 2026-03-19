@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+set +u
 source /opt/ros/humble/setup.bash
+set -u
 
 WORLD_FILE="${GAZEBO_WORLD_FILE:-/opt/iconom/sim/worlds/empty.sdf}"
 

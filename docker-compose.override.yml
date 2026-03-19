@@ -6,8 +6,10 @@ services:
   gazebo:
     stdin_open: true
     tty: true
+    command: ["bash", "-lc", "gz sim -r \"${GAZEBO_WORLD_FILE}\""]
     environment:
       DISPLAY: ${DISPLAY:-}
+      QT_X11_NO_MITSHM: "1"
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
 

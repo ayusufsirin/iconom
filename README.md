@@ -27,6 +27,23 @@ The first integrated baseline is now `plane_01` via [integration-single-vehicle.
 
 The first actual one-vehicle runtime attempt is [bringup-single-vehicle.sh](./scripts/bringup-single-vehicle.sh). It launches PX4's native `gz_rc_cessna` Gazebo path inside the `px4` container while `xrce_agent` and `ros2_app` run as companion services.
 
+## Local Gazebo GUI
+
+The canonical stack remains headless in [docker-compose.yml](./docker-compose.yml). Local host GUI behavior is added only through [docker-compose.override.yml](./docker-compose.override.yml).
+
+To run Gazebo with a local GUI from the repo root:
+
+```bash
+xhost +local:docker
+docker compose up gazebo
+```
+
+To force the canonical headless path even on the local host:
+
+```bash
+docker compose -f docker-compose.yml up gazebo
+```
+
 ## Phase 0 Goal
 
 Freeze the minimum set of architectural decisions required to let future coding agents work in isolation without redefining the project on every task.
