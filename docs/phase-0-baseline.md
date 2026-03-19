@@ -169,6 +169,16 @@ The smoke test must not depend on GUI tooling or human interaction.
 
 Auto-merge is out of scope for phase 1 and remains disabled until the smoke test is stable over repeated runs.
 
+## Local Host Execution
+
+The project must support running the same Docker/Compose-based stack on the developer host for both debugging and real use, not only on the remote CI runner.
+
+There will be one canonical Compose stack and image strategy shared by CI and local execution.
+
+CI uses a headless profile, while local host use may enable additional profiles for GUI or development tooling, but service names, images, environment model, and smoke-test assumptions must remain aligned.
+
+Local execution is a first-class requirement because the stack must be usable interactively for debugging, inspection, and development, not just CI verification.
+
 ## Agent Safety Boundaries
 
 Future coding agents should not be allowed to redefine the architecture ad hoc. Before agent automation is enabled, the repo should contain:
@@ -192,7 +202,7 @@ These should require deliberate review even if an agent prepares the patch.
 
 ## Phase 0 Status
 
-Phase-0 architecture decisions are now locked. The next phase is repository guardrails plus implementation scaffolding.
+Phase-0 architecture decisions are now locked, including aligned local-host and remote-CI execution. The next phase is repository guardrails plus implementation scaffolding.
 
 ## Proposed Repository Shape
 
