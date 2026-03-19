@@ -20,7 +20,8 @@ This scaffold defines the first implementation contract without claiming the sim
 - `gazebo` is now a real Ubuntu 22.04 Gazebo Harmonic headless slice with the deliberate Humble/Harmonic `ros_gz` bridge packages installed.
 - `scripts/smoke.sh` now covers slice-level availability checks only.
 - `scripts/integration-single-vehicle.sh` defines the first integrated `plane_01` launch contract for `xrce_agent`, `gazebo`, `ros2_app`, and `px4`.
+- `scripts/bringup-single-vehicle.sh` is now the first actual PX4-in-Gazebo bring-up attempt for one aircraft.
 
 ## Next Implementation Step
 
-Use the `plane_01` integration baseline as the starting point, then wire the actual PX4-to-Gazebo vehicle startup, camera topics, and ROS bridge validation into that path.
+Use the first actual bring-up path as the starting point, then move from PX4-native Gazebo launch to the fully container-separated runtime path and add camera plus runtime ROS bridge validation.

@@ -26,11 +26,15 @@ RUN bash ./Tools/setup/ubuntu.sh --no-sim-tools --no-nuttx \
  && make px4_sitl_default
 
 COPY docker/px4/entrypoint.sh /usr/local/bin/px4-entrypoint.sh
+COPY docker/px4/run-single-vehicle.sh /usr/local/bin/px4-run-single-vehicle.sh
 
-RUN chmod +x /usr/local/bin/px4-entrypoint.sh
+RUN chmod +x /usr/local/bin/px4-entrypoint.sh /usr/local/bin/px4-run-single-vehicle.sh
 
 ENV PX4_HOME=/opt/PX4-Autopilot
 ENV PX4_GIT_REF=v1.16.0
+ENV PX4_HEADLESS=1
+ENV PX4_SYS_AUTOSTART=4003
+ENV PX4_GZ_WORLD=default
 ENV PX4_UXRCE_DDS_NS=plane_01
 ENV UXRCE_DDS_KEY=1
 ENV XRCE_AGENT_UDP_PORT=8888

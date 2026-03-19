@@ -14,6 +14,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Canonical Compose Stack](./docker-compose.yml)
 - [Smoke Script](./scripts/smoke.sh)
 - [Single-Vehicle Integration Script](./scripts/integration-single-vehicle.sh)
+- [Single-Vehicle Bring-Up Script](./scripts/bringup-single-vehicle.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Current Slice
@@ -24,6 +25,8 @@ This repo requires Docker Compose v2 via `docker compose`.
 
 The first integrated baseline is now `plane_01` via [integration-single-vehicle.sh](./scripts/integration-single-vehicle.sh). It validates the shared one-vehicle launch contract without claiming full PX4-in-Gazebo vehicle runtime yet.
 
+The first actual one-vehicle runtime attempt is [bringup-single-vehicle.sh](./scripts/bringup-single-vehicle.sh). It launches PX4's native `gz_rc_cessna` Gazebo path inside the `px4` container while `xrce_agent` and `ros2_app` run as companion services.
+
 ## Phase 0 Goal
 
 Freeze the minimum set of architectural decisions required to let future coding agents work in isolation without redefining the project on every task.
@@ -32,6 +35,6 @@ Freeze the minimum set of architectural decisions required to let future coding 
 
 With phase-0 decisions and guardrails in place, the next work should be:
 
-1. move the `plane_01` integration baseline from contract validation to real PX4-in-Gazebo vehicle startup,
+1. validate and stabilize the actual `gz_rc_cessna` one-vehicle bring-up path,
 2. add the first runtime ROS bridge and telemetry topic checks,
-3. wire the smoke workflow to the real single-vehicle path rather than slice-only checks.
+3. reconcile the PX4-native bring-up path with the standalone `gazebo` service for a fully separated runtime.

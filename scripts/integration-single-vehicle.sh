@@ -71,6 +71,7 @@ echo "gazebo world: ${GAZEBO_WORLD_FILE}"
 echo
 echo "this check validates the first integrated bring-up contract for one vehicle."
 echo "it does not claim that PX4 has spawned into Gazebo or that camera/ROS bridge topics are complete."
+echo "for the first actual PX4-in-Gazebo runtime attempt, use scripts/bringup-single-vehicle.sh"
 echo
 echo "step 1: validating compose config"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" config >/dev/null
@@ -98,7 +99,7 @@ echo "step 4: validating baseline launch contract inside running containers"
 
 echo "integrated baseline contract is wired"
 echo "remaining gaps:"
-echo "  - px4 is not yet launched into gazebo with an actual spawned vehicle"
+echo "  - this script does not execute the actual PX4-in-Gazebo bring-up"
 echo "  - camera sensors are not wired"
 echo "  - ros_gz topic bridging is installed but not validated for runtime topics"
 echo "  - the full fixed-wing mission target is not complete" >&2

@@ -9,6 +9,9 @@ services:
         PX4_GIT_REF: ${PX4_GIT_REF:-v1.16.0}
     environment:
       ICONOM_VEHICLE_NAMESPACE: ${ICONOM_VEHICLE_NAMESPACE:-plane_01}
+      PX4_HEADLESS: ${PX4_HEADLESS:-1}
+      PX4_SYS_AUTOSTART: ${PX4_SYS_AUTOSTART:-4003}
+      PX4_GZ_WORLD: ${PX4_GZ_WORLD:-default}
       PX4_UXRCE_DDS_NS: ${PX4_UXRCE_DDS_NS:-plane_01}
       PX4_GIT_REF: ${PX4_GIT_REF:-v1.16.0}
       PX4_SIM_MODEL: ${PX4_SIM_MODEL:-gz_rc_cessna}
@@ -22,6 +25,7 @@ services:
       gazebo:
         condition: service_started
     restart: "no"
+    command: ["bash", "-lc", "echo 'px4 slice ready; use /usr/local/bin/px4-run-single-vehicle.sh for the real one-vehicle bring-up path'; sleep infinity"]
 
   gazebo:
     build:

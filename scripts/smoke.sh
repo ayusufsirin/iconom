@@ -52,6 +52,7 @@ echo "slice under test: xrce_agent"
 echo "real services under test: xrce_agent, ros2_app, px4, gazebo"
 echo "scope: service-slice availability and coexistence only"
 echo "for the integrated plane_01 baseline, use scripts/integration-single-vehicle.sh"
+echo "for the actual one-vehicle PX4-in-Gazebo attempt, use scripts/bringup-single-vehicle.sh"
 echo
 echo "step 1: validating compose config"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" config >/dev/null
@@ -160,5 +161,5 @@ if ! grep -qx "ros2_app" <<<"${RUNNING_SERVICES}"; then
 fi
 
 echo "all four service slices succeeded"
-echo "this smoke check does not validate the single-vehicle launch contract; use scripts/integration-single-vehicle.sh for that" >&2
+echo "this smoke check does not validate the single-vehicle launch contract or the actual PX4-in-Gazebo runtime attempt" >&2
 exit 3
