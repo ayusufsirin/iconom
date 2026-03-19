@@ -34,13 +34,19 @@ services:
     restart: "no"
 
   ros2_app:
-    image: alpine:3.20
-    command: ["sh", "-lc", "echo 'ros2_app scaffold only: ROS 2 app image/build not implemented yet'; sleep infinity"]
+    build:
+      context: .
+      dockerfile: docker/ros2_app/Dockerfile
     environment:
       ICONOM_VEHICLE_NAMESPACE: ${ICONOM_VEHICLE_NAMESPACE:-plane_01}
       PX4_UXRCE_DDS_NS: ${PX4_UXRCE_DDS_NS:-plane_01}
+      ROS_DISTRO: ${ROS_DISTRO:-humble}
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       USE_SIM_TIME: ${USE_SIM_TIME:-true}
       CAMERA_TOPIC: ${CAMERA_TOPIC:-/plane_01/camera/image_raw}
       PX4_TELEMETRY_TOPIC_PREFIX: ${PX4_TELEMETRY_TOPIC_PREFIX:-/plane_01/fmu/out}
+    working_dir: /workspaces/ros2_ws
+    volumes:
+      - ./ros2_ws:/workspaces/ros2_ws
+    command: ["bash", "-lc", "echo 'ros2_app base workspace ready; no project packages are implemented yet'; sleep infinity"]
     restart: "no"

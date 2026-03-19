@@ -16,7 +16,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 
 ## Current Slice
 
-The first real service slice is `xrce_agent`. The other services in the Compose stack are still explicit scaffolds.
+The first real service slices are `xrce_agent` and `ros2_app`. The `px4` and `gazebo` services are still explicit scaffolds.
 
 This repo requires Docker Compose v2 via `docker compose`.
 
