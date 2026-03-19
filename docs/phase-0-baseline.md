@@ -107,6 +107,16 @@ The shared Micro XRCE-DDS Agent listens on UDP `8888` for all simulated vehicles
 
 These choices align with PX4 multi-vehicle conventions while using a project-specific namespace instead of the default `px4_N` pattern.
 
+## uXRCE-DDS Topology
+
+This project uses one shared `MicroXRCEAgent` instance on UDP `8888` for all simulated PX4 vehicles.
+
+Each PX4 instance must use a unique non-zero `UXRCE_DDS_KEY`, aligned with instance identity and system identity, while topic separation is handled through the chosen ROS namespace pattern.
+
+This follows PX4's documented multi-vehicle ROS 2 simulation model, where multiple PX4 clients connect to one shared agent, and PX4 guidance is to run a single agent per connection channel.
+
+Per-vehicle agents are intentionally rejected for phase 1 because they add operational complexity without helping the first milestone.
+
 ## Swarm Rules to Preserve From Day One
 
 Even though phase 1 is single-vehicle, the layout must not block later multi-vehicle work.
@@ -163,8 +173,7 @@ These should require deliberate review even if an agent prepares the patch.
 The following items are intentionally left open, but must be resolved before phase-1 implementation:
 
 1. Exact Gazebo Harmonic installation and image strategy
-2. Exact `uXRCE-DDS` topology for future multi-vehicle expansion
-3. Exact remote CI runner model and smoke-test execution shape
+2. Exact remote CI runner model and smoke-test execution shape
 
 ## Proposed Repository Shape
 
