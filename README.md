@@ -16,7 +16,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 
 ## Current Slice
 
-The first real service slices are `xrce_agent` and `ros2_app`. The `px4` and `gazebo` services are still explicit scaffolds.
+The first real service slices are `xrce_agent`, `ros2_app`, and `px4`. The `gazebo` service is still an explicit scaffold.
 
 This repo requires Docker Compose v2 via `docker compose`.
 
@@ -28,6 +28,6 @@ Freeze the minimum set of architectural decisions required to let future coding 
 
 With phase-0 decisions and guardrails in place, the next work should be:
 
-1. keep `xrce_agent` working and add the next real service slice,
-2. extend `scripts/smoke.sh` from agent-only checks to stack-level checks,
+1. keep `xrce_agent`, `ros2_app`, and `px4` working while implementing `gazebo`,
+2. extend `scripts/smoke.sh` from slice checks to single-vehicle stack checks,
 3. wire the smoke workflow to a functioning single-vehicle stack.
