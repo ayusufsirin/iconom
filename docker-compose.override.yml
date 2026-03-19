@@ -1,0 +1,23 @@
+services:
+  px4:
+    stdin_open: true
+    tty: true
+
+  gazebo:
+    stdin_open: true
+    tty: true
+
+  ros2_app:
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./ros2_ws:/workspaces/ros2_ws
+
+  dev_tools:
+    image: alpine:3.20
+    command: ["sh", "-lc", "echo 'local dev scaffold only'; sleep infinity"]
+    profiles: ["dev"]
+    restart: "no"
+
+# This file is for local host execution extras only.
+# It extends the canonical stack from docker-compose.yml rather than defining a separate stack.

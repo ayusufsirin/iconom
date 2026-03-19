@@ -1,0 +1,34 @@
+name: smoke-sim
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "docker-compose.yml"
+      - "docker-compose.override.yml"
+      - ".env.example"
+      - "scripts/smoke.sh"
+      - ".github/workflows/smoke-sim.yml"
+      - "docker/**"
+      - "sim/**"
+      - "ros2_ws/**"
+
+jobs:
+  smoke:
+    name: Scaffold smoke check
+    runs-on: [self-hosted, linux, x64, sim]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show scaffold status
+        run: |
+          echo "This workflow is scaffold-only until the underlying PX4/Gazebo/ROS stack is implemented."
+
+      - name: Run smoke scaffold
+        continue-on-error: true
+        run: ./scripts/smoke.sh
+
+      - name: Explain scaffold result
+        run: |
+          echo "The smoke script is expected to report 'not yet implemented' until real images and checks are added."

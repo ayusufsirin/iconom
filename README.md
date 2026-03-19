@@ -7,8 +7,11 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 ## Start Here
 
 - [Phase 0 Baseline](./docs/phase-0-baseline.md)
+- [Phase 1 Scaffold](./docs/phase-1-scaffold.md)
 - [Agent Rules](./AGENTS.md)
 - [Task Template](./docs/task-template.md)
+- [Canonical Compose Stack](./docker-compose.yml)
+- [Smoke Script](./scripts/smoke.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Phase 0 Goal
@@ -19,6 +22,6 @@ Freeze the minimum set of architectural decisions required to let future coding 
 
 With phase-0 decisions and guardrails in place, the next work should be:
 
-1. implement the canonical phase-1 Compose stack and image skeleton,
-2. add the first self-hosted CI workflow and smoke-test script,
-3. implement the single-vehicle smoke-test target only.
+1. replace the placeholder service definitions with real project-owned images,
+2. implement the deterministic headless smoke checks in `scripts/smoke.sh`,
+3. wire the smoke workflow to a functioning single-vehicle stack.
