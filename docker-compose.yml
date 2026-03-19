@@ -16,6 +16,11 @@ services:
       XRCE_AGENT_UDP_PORT: ${XRCE_AGENT_UDP_PORT:-8888}
       MAVLINK_OFFBOARD_BASE_PORT: ${MAVLINK_OFFBOARD_BASE_PORT:-14540}
       MAVLINK_GCS_PORT: ${MAVLINK_GCS_PORT:-14550}
+    depends_on:
+      xrce_agent:
+        condition: service_started
+      gazebo:
+        condition: service_started
     restart: "no"
 
   gazebo:
@@ -58,6 +63,11 @@ services:
       USE_SIM_TIME: ${USE_SIM_TIME:-true}
       CAMERA_TOPIC: ${CAMERA_TOPIC:-/plane_01/camera/image_raw}
       PX4_TELEMETRY_TOPIC_PREFIX: ${PX4_TELEMETRY_TOPIC_PREFIX:-/plane_01/fmu/out}
+    depends_on:
+      xrce_agent:
+        condition: service_started
+      gazebo:
+        condition: service_started
     working_dir: /workspaces/ros2_ws
     volumes:
       - ./ros2_ws:/workspaces/ros2_ws

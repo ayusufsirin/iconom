@@ -19,7 +19,7 @@ require_file() {
   fi
 }
 
-echo "iconom smoke scaffold"
+echo "iconom service-slice smoke check"
 echo "root: ${ROOT_DIR}"
 
 require_cmd docker
@@ -50,7 +50,8 @@ echo "  - ${ENV_FILE}"
 echo
 echo "slice under test: xrce_agent"
 echo "real services under test: xrce_agent, ros2_app, px4, gazebo"
-echo "integration status: all service slices exist, but the full fixed-wing camera + PX4 + ROS target is not wired yet"
+echo "scope: service-slice availability and coexistence only"
+echo "for the integrated plane_01 baseline, use scripts/integration-single-vehicle.sh"
 echo
 echo "step 1: validating compose config"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" config >/dev/null
@@ -159,5 +160,5 @@ if ! grep -qx "ros2_app" <<<"${RUNNING_SERVICES}"; then
 fi
 
 echo "all four service slices succeeded"
-echo "full smoke is still not implemented because PX4<->Gazebo vehicle wiring, camera topics, and ROS bridge validation are not complete yet" >&2
+echo "this smoke check does not validate the single-vehicle launch contract; use scripts/integration-single-vehicle.sh for that" >&2
 exit 3

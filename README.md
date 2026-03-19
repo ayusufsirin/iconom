@@ -8,10 +8,12 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 
 - [Phase 0 Baseline](./docs/phase-0-baseline.md)
 - [Phase 1 Scaffold](./docs/phase-1-scaffold.md)
+- [Phase 1 Integration](./docs/phase-1-integration.md)
 - [Agent Rules](./AGENTS.md)
 - [Task Template](./docs/task-template.md)
 - [Canonical Compose Stack](./docker-compose.yml)
 - [Smoke Script](./scripts/smoke.sh)
+- [Single-Vehicle Integration Script](./scripts/integration-single-vehicle.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Current Slice
@@ -19,6 +21,8 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 All four service slices now exist: `xrce_agent`, `ros2_app`, `px4`, and `gazebo`. The remaining gap is full vehicle and sensor integration, not basic service availability.
 
 This repo requires Docker Compose v2 via `docker compose`.
+
+The first integrated baseline is now `plane_01` via [integration-single-vehicle.sh](./scripts/integration-single-vehicle.sh). It validates the shared one-vehicle launch contract without claiming full PX4-in-Gazebo vehicle runtime yet.
 
 ## Phase 0 Goal
 
@@ -28,6 +32,6 @@ Freeze the minimum set of architectural decisions required to let future coding 
 
 With phase-0 decisions and guardrails in place, the next work should be:
 
-1. keep `xrce_agent`, `ros2_app`, and `px4` working while implementing `gazebo`,
-2. extend `scripts/smoke.sh` from slice checks to single-vehicle stack checks,
-3. wire the smoke workflow to a functioning single-vehicle stack.
+1. move the `plane_01` integration baseline from contract validation to real PX4-in-Gazebo vehicle startup,
+2. add the first runtime ROS bridge and telemetry topic checks,
+3. wire the smoke workflow to the real single-vehicle path rather than slice-only checks.
