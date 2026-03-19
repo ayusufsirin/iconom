@@ -6,6 +6,10 @@ services:
   gazebo:
     stdin_open: true
     tty: true
+    environment:
+      DISPLAY: ${DISPLAY:-}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
 
   ros2_app:
     stdin_open: true
@@ -21,3 +25,4 @@ services:
 
 # This file is for local host execution extras only.
 # It extends the canonical stack from docker-compose.yml rather than defining a separate stack.
+# GUI and display handling belong here rather than in the canonical headless stack.

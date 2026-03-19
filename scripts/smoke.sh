@@ -49,14 +49,14 @@ echo "env file:"
 echo "  - ${ENV_FILE}"
 echo
 echo "slice under test: xrce_agent"
-echo "real services under test: xrce_agent, ros2_app, px4"
-echo "full stack status: gazebo is still a scaffold placeholder"
+echo "real services under test: xrce_agent, ros2_app, px4, gazebo"
+echo "integration status: all service slices exist, but the full fixed-wing camera + PX4 + ROS target is not wired yet"
 echo
 echo "step 1: validating compose config"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" config >/dev/null
 
-echo "step 2: building xrce_agent, ros2_app, and px4"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app px4
+echo "step 2: building xrce_agent, ros2_app, px4, and gazebo"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app px4 gazebo
 
 echo "step 3: starting xrce_agent only"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d xrce_agent
@@ -123,6 +123,41 @@ if ! grep -qx "ros2_app" <<<"${RUNNING_SERVICES}"; then
   exit 17
 fi
 
-echo "xrce_agent, ros2_app, and px4 slices succeeded"
-echo "full smoke is still not implemented because gazebo remains a scaffold service" >&2
+echo "step 11: starting gazebo only"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d gazebo
+
+echo "step 12: checking gazebo state"
+if ! "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" ps --services --status running | grep -qx "gazebo"; then
+  echo "gazebo did not reach running state" >&2
+  "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs gazebo || true
+  exit 18
+fi
+
+echo "step 13: checking all implemented slices together"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d xrce_agent ros2_app px4 gazebo
+
+RUNNING_SERVICES="$("${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" ps --services --status running)"
+if ! grep -qx "gazebo" <<<"${RUNNING_SERVICES}"; then
+  echo "gazebo did not remain running in combined startup" >&2
+  "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs gazebo || true
+  exit 19
+fi
+if ! grep -qx "px4" <<<"${RUNNING_SERVICES}"; then
+  echo "px4 did not remain running in combined startup with gazebo" >&2
+  "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs px4 || true
+  exit 20
+fi
+if ! grep -qx "xrce_agent" <<<"${RUNNING_SERVICES}"; then
+  echo "xrce_agent did not remain running in combined startup with gazebo" >&2
+  "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs xrce_agent || true
+  exit 21
+fi
+if ! grep -qx "ros2_app" <<<"${RUNNING_SERVICES}"; then
+  echo "ros2_app did not remain running in combined startup with gazebo" >&2
+  "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs ros2_app || true
+  exit 22
+fi
+
+echo "all four service slices succeeded"
+echo "full smoke is still not implemented because PX4<->Gazebo vehicle wiring, camera topics, and ROS bridge validation are not complete yet" >&2
 exit 3

@@ -19,11 +19,19 @@ services:
     restart: "no"
 
   gazebo:
-    image: alpine:3.20
-    command: ["sh", "-lc", "echo 'gazebo scaffold only: Gazebo Harmonic image/build not implemented yet'; sleep infinity"]
+    build:
+      context: .
+      dockerfile: docker/gazebo/Dockerfile
     environment:
       ICONOM_VEHICLE_NAMESPACE: ${ICONOM_VEHICLE_NAMESPACE:-plane_01}
-      GAZEBO_WORLD: ${GAZEBO_WORLD:-empty}
+      ROS_DISTRO: ${ROS_DISTRO:-humble}
+      USE_SIM_TIME: ${USE_SIM_TIME:-true}
+      GZ_SIM_RESOURCE_PATH: ${GZ_SIM_RESOURCE_PATH:-/opt/iconom/sim}
+      GAZEBO_WORLD_FILE: ${GAZEBO_WORLD_FILE:-/opt/iconom/sim/worlds/empty.sdf}
+    working_dir: /opt/iconom/sim
+    volumes:
+      - ./sim:/opt/iconom/sim:ro
+    command: ["bash", "-lc", "gz sim -s -r \"${GAZEBO_WORLD_FILE}\""]
     restart: "no"
 
   xrce_agent:

@@ -17,8 +17,9 @@ This scaffold defines the first implementation contract without claiming the sim
 - `xrce_agent` is built in a project-owned Ubuntu 22.04 image and installs eProsima Micro XRCE-DDS Agent from the upstream `v2.4.3` release source.
 - `ros2_app` is now a real Ubuntu 22.04 + ROS 2 Humble base container with a mounted workspace root at `/workspaces/ros2_ws`.
 - `px4` is now a real Ubuntu 22.04 PX4 `v1.16.0` build slice that validates the SITL binary and agreed runtime configuration without claiming a Gazebo-backed sim run.
-- The smoke script now validates compose config and exercises `xrce_agent`, `ros2_app`, and `px4`, but still exits nonzero because the full stack is not implemented yet.
+- `gazebo` is now a real Ubuntu 22.04 Gazebo Harmonic headless slice with the deliberate Humble/Harmonic `ros_gz` bridge packages installed.
+- The smoke script now validates compose config and exercises all four service slices, but still exits nonzero because the full fixed-wing camera + PX4 + ROS target is not implemented yet.
 
 ## Next Implementation Step
 
-Keep `xrce_agent`, `ros2_app`, and `px4` as the reference slices, then replace the remaining `gazebo` placeholder with a real simulator slice and extend the smoke checks to the full single-vehicle stack.
+Use the four real service slices as the baseline, then wire the actual PX4-to-Gazebo vehicle startup, camera topics, and ROS bridge validation into the single-vehicle smoke path.

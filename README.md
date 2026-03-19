@@ -16,7 +16,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 
 ## Current Slice
 
-The first real service slices are `xrce_agent`, `ros2_app`, and `px4`. The `gazebo` service is still an explicit scaffold.
+All four service slices now exist: `xrce_agent`, `ros2_app`, `px4`, and `gazebo`. The remaining gap is full vehicle and sensor integration, not basic service availability.
 
 This repo requires Docker Compose v2 via `docker compose`.
 
