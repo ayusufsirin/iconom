@@ -22,10 +22,15 @@ services:
     restart: "no"
 
   xrce_agent:
-    image: alpine:3.20
-    command: ["sh", "-lc", "echo 'xrce_agent scaffold only: MicroXRCEAgent image/build not implemented yet'; sleep infinity"]
+    build:
+      context: .
+      dockerfile: docker/xrce_agent/Dockerfile
+      args:
+        XRCE_AGENT_VERSION: ${XRCE_AGENT_VERSION:-v2.4.3}
     environment:
       XRCE_AGENT_UDP_PORT: ${XRCE_AGENT_UDP_PORT:-8888}
+    ports:
+      - "${XRCE_AGENT_UDP_PORT:-8888}:${XRCE_AGENT_UDP_PORT:-8888}/udp"
     restart: "no"
 
   ros2_app:

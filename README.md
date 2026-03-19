@@ -14,6 +14,12 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Smoke Script](./scripts/smoke.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
+## Current Slice
+
+The first real service slice is `xrce_agent`. The other services in the Compose stack are still explicit scaffolds.
+
+This repo requires Docker Compose v2 via `docker compose`.
+
 ## Phase 0 Goal
 
 Freeze the minimum set of architectural decisions required to let future coding agents work in isolation without redefining the project on every task.
@@ -22,6 +28,6 @@ Freeze the minimum set of architectural decisions required to let future coding 
 
 With phase-0 decisions and guardrails in place, the next work should be:
 
-1. replace the placeholder service definitions with real project-owned images,
-2. implement the deterministic headless smoke checks in `scripts/smoke.sh`,
+1. keep `xrce_agent` working and add the next real service slice,
+2. extend `scripts/smoke.sh` from agent-only checks to stack-level checks,
 3. wire the smoke workflow to a functioning single-vehicle stack.
