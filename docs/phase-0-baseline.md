@@ -45,6 +45,14 @@ These pins are based on current official PX4, ROS, and Gazebo documentation as o
 
 Gazebo Harmonic with ROS 2 Humble is being chosen intentionally. It is a supported PX4 path, but it is not Gazebo's default ROS pairing, so it carries some integration risk around package and bridge setup.
 
+The project will use project-owned Docker images based on Ubuntu 22.04, not ad hoc host installs.
+
+Gazebo Harmonic will be installed in those images from `packages.osrfoundation.org` via the `gz-harmonic` packages.
+
+ROS/Gazebo bridging for this non-default pairing will use the Harmonic-specific ROS packages for Humble, namely `ros-humble-ros-gzharmonic`, rather than the default Humble Gazebo pairing.
+
+Source builds of Gazebo or `ros_gz` are out of scope for phase 1 and should only be introduced if binary packaging proves insufficient.
+
 ### Integration Boundaries
 
 - Primary PX4-to-ROS integration path: `uXRCE-DDS`
@@ -147,6 +155,20 @@ The smoke test should prove only:
 
 If command validation is included in CI, it should be limited to one deterministic check.
 
+## Phase 1 CI Model
+
+Phase-1 CI runs in GitHub Actions on one self-hosted Linux x64 runner on the remote machine.
+
+The workflow must target explicit runner labels such as `[self-hosted, linux, x64, sim]` rather than relying on a generic runner.
+
+The first workflow shape is `workflow_dispatch` plus pull-request-triggered execution for infrastructure branches, not full push-on-every-branch automation.
+
+The smoke test is a deterministic headless check that brings up the container stack, confirms PX4 SITL, Gazebo, the shared XRCE agent, the ROS camera topic, and the PX4 telemetry topic path, then exits cleanly.
+
+The smoke test must not depend on GUI tooling or human interaction.
+
+Auto-merge is out of scope for phase 1 and remains disabled until the smoke test is stable over repeated runs.
+
 ## Agent Safety Boundaries
 
 Future coding agents should not be allowed to redefine the architecture ad hoc. Before agent automation is enabled, the repo should contain:
@@ -168,12 +190,9 @@ Until the stack is stable, infrastructure files should be treated as high-risk:
 
 These should require deliberate review even if an agent prepares the patch.
 
-## Open Decisions That Must Be Resolved Next
+## Phase 0 Status
 
-The following items are intentionally left open, but must be resolved before phase-1 implementation:
-
-1. Exact Gazebo Harmonic installation and image strategy
-2. Exact remote CI runner model and smoke-test execution shape
+Phase-0 architecture decisions are now locked. The next phase is repository guardrails plus implementation scaffolding.
 
 ## Proposed Repository Shape
 
