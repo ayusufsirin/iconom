@@ -20,6 +20,8 @@ This document defines the first honest single-vehicle integration baseline.
 - `scripts/check-px4-telemetry.sh` is the first narrow telemetry discovery check for `/plane_01/fmu/out/...` during the current runtime path.
 - `ros2_ws/src/px4_msgs.repos` pins the minimum ROS-side PX4 message dependency for telemetry type visibility.
 - `scripts/check-camera-bridge.sh` validates the first camera slice by discovering Gazebo camera topics in the live PX4 runtime container and bridging them into ROS 2.
+- `ros2_ws/src/iconom_vision` contains the first repo-owned ROS 2 vision package for the camera slice.
+- `scripts/check-camera-subscriber.sh` validates that a ROS-side subscriber can receive at least one bridged image frame on `/plane_01/camera/image_raw`.
 - The current camera bridge process runs in a one-off `ros_gz_bridge` container that shares the live PX4 runtime network namespace.
 
 ## What Is Not Yet Wired
