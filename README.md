@@ -9,6 +9,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Phase 0 Baseline](./docs/phase-0-baseline.md)
 - [Phase 1 Scaffold](./docs/phase-1-scaffold.md)
 - [Phase 1 Integration](./docs/phase-1-integration.md)
+- [Phase 2 Plan](./docs/phase-2-plan.md)
 - [Agent Rules](./AGENTS.md)
 - [Task Template](./docs/task-template.md)
 - [Canonical Compose Stack](./docker-compose.yml)
@@ -123,10 +124,8 @@ xhost +local:docker
 
 Freeze the minimum set of architectural decisions required to let future coding agents work in isolation without redefining the project on every task.
 
-## Immediate Next Outcome
+## Phase 2 Direction
 
-With phase-0 decisions and guardrails in place, the next work should be:
+Phase 2 starts from the tagged `phase1-baseline` and keeps the same single-vehicle contract while removing the largest remaining architectural compromise: Gazebo should become a first-class standalone runtime service instead of being launched from inside the `px4` container.
 
-1. keep the phase-1 launch and acceptance entrypoints stable,
-2. reconcile the PX4-native bring-up path with the standalone `gazebo` service for a fully separated runtime,
-3. use the stabilized phase-1 baseline as the handoff point into phase 2.
+The current phase-2 source of truth is [phase-2-plan.md](./docs/phase-2-plan.md).
