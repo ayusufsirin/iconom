@@ -42,10 +42,26 @@ fi
 require_file "${COMPOSE_FILE}"
 require_file "${ENV_FILE}"
 
+OVERRIDE_PX4_COMMAND_NAME="${PX4_COMMAND_NAME-}"
+OVERRIDE_PX4_COMMAND_TIMEOUT_SEC="${PX4_COMMAND_TIMEOUT_SEC-}"
+OVERRIDE_PX4_COMMAND_DISCOVERY_WAIT_SEC="${PX4_COMMAND_DISCOVERY_WAIT_SEC-}"
+
 set -a
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 set +a
+
+if [[ -n "${OVERRIDE_PX4_COMMAND_NAME}" ]]; then
+  PX4_COMMAND_NAME="${OVERRIDE_PX4_COMMAND_NAME}"
+fi
+
+if [[ -n "${OVERRIDE_PX4_COMMAND_TIMEOUT_SEC}" ]]; then
+  PX4_COMMAND_TIMEOUT_SEC="${OVERRIDE_PX4_COMMAND_TIMEOUT_SEC}"
+fi
+
+if [[ -n "${OVERRIDE_PX4_COMMAND_DISCOVERY_WAIT_SEC}" ]]; then
+  PX4_COMMAND_DISCOVERY_WAIT_SEC="${OVERRIDE_PX4_COMMAND_DISCOVERY_WAIT_SEC}"
+fi
 
 if [[ "${ICONOM_VEHICLE_NAMESPACE:-}" != "plane_01" ]]; then
   echo "vehicle command check requires ICONOM_VEHICLE_NAMESPACE=plane_01" >&2
@@ -63,10 +79,13 @@ trap cleanup EXIT
 COMMAND_TOPIC="${PX4_COMMAND_TOPIC:-/plane_01/fmu/in/vehicle_command}"
 COMMAND_ACK_TOPIC="${PX4_COMMAND_ACK_TOPIC:-/plane_01/fmu/out/vehicle_command_ack}"
 DISCOVERY_WAIT_SEC="${PX4_COMMAND_DISCOVERY_WAIT_SEC:-45}"
+PRE_COMMAND_DELAY_SEC="${PX4_COMMAND_PRE_DELAY_SEC:-0}"
 
 echo "iconom vehicle command check"
+echo "command action: ${PX4_COMMAND_NAME:-disarm}"
 echo "command topic target: ${COMMAND_TOPIC}"
 echo "ack topic target: ${COMMAND_ACK_TOPIC}"
+echo "pre-command delay: ${PRE_COMMAND_DELAY_SEC}s"
 echo
 echo "this checks the first ROS-side control slice:"
 echo "  - PX4 runtime starts against the existing xrce_agent path"
@@ -142,6 +161,11 @@ for ((i=1; i<=DISCOVERY_WAIT_SEC; i++)); do
 
   sleep 1
 done
+
+if [[ "${PRE_COMMAND_DELAY_SEC}" != "0" ]]; then
+  echo "step 7b: waiting ${PRE_COMMAND_DELAY_SEC}s before publishing the command"
+  sleep "${PRE_COMMAND_DELAY_SEC}"
+fi
 
 echo "step 8: running the ROS vehicle command client"
 if ! "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" exec -T ros2_app bash -lc "

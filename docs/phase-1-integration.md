@@ -24,6 +24,10 @@ This document defines the first honest single-vehicle integration baseline.
 - `scripts/check-camera-subscriber.sh` validates that a ROS-side subscriber can receive at least one bridged image frame on `/plane_01/camera/image_raw`.
 - `ros2_ws/src/iconom_control` contains the first repo-owned ROS 2 control package for the command slice.
 - `scripts/check-vehicle-command.sh` validates a ROS-side `VehicleCommand` publish plus `VehicleCommandAck` roundtrip on `/plane_01/fmu/in/...` and `/plane_01/fmu/out/...`.
+- The current command slice validates both `disarm` and `arm` actions for `plane_01`.
+- The current `gz_rc_cessna` phase-1 baseline explicitly overrides two PX4 airframe defaults to make headless SITL arming achievable:
+  - `NAV_DLL_ACT=0`
+  - `SYS_HAS_NUM_ASPD=0`
 - The current camera bridge process runs in a one-off `ros_gz_bridge` container that shares the live PX4 runtime network namespace.
 
 ## What Is Not Yet Wired

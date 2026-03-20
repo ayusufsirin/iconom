@@ -48,6 +48,11 @@ The next ROS-side proof is [check-camera-subscriber.sh](./scripts/check-camera-s
 
 The next control-side proof is [check-vehicle-command.sh](./scripts/check-vehicle-command.sh). It builds the minimal `iconom_control` package in `ros2_ws`, publishes one `VehicleCommand` on `/plane_01/fmu/in/vehicle_command`, and requires a matching `VehicleCommandAck` on `/plane_01/fmu/out/vehicle_command_ack`.
 
+The control check now supports both `disarm` and `arm` via `PX4_COMMAND_NAME`. For the current `gz_rc_cessna` phase-1 baseline, the PX4 image overrides two airframe defaults to make SITL arming achievable without a GCS or physical airspeed requirement:
+
+- `NAV_DLL_ACT=0`
+- `SYS_HAS_NUM_ASPD=0`
+
 ## Local Gazebo GUI
 
 The canonical stack remains headless in [docker-compose.yml](./docker-compose.yml). Local host GUI behavior is added only through [docker-compose.override.yml](./docker-compose.override.yml).

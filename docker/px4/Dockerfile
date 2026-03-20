@@ -67,6 +67,30 @@ RUN grep -n 'model://mono_cam' /opt/PX4-Autopilot/Tools/simulation/gz/models/rc_
 RUN python3 - <<'PY'
 from pathlib import Path
 
+path = Path("/opt/PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes/4003_gz_rc_cessna")
+text = path.read_text()
+
+if "param set-default NAV_DLL_ACT 2" not in text:
+    raise SystemExit(f"expected NAV_DLL_ACT default not found in {path}")
+
+text = text.replace("param set-default NAV_DLL_ACT 2", "param set-default NAV_DLL_ACT 0", 1)
+
+anchor = "param set-default SENS_EN_ARSPDSIM 1\n"
+insert = "param set-default SENS_EN_ARSPDSIM 1\nparam set-default SYS_HAS_NUM_ASPD 0\n"
+
+if anchor not in text:
+    raise SystemExit(f"expected airspeed insertion point not found in {path}")
+
+text = text.replace(anchor, insert, 1)
+path.write_text(text)
+PY
+
+RUN grep -n 'SYS_HAS_NUM_ASPD' /opt/PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes/4003_gz_rc_cessna \
+ && grep -n 'NAV_DLL_ACT' /opt/PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes/4003_gz_rc_cessna
+
+RUN python3 - <<'PY'
+from pathlib import Path
+
 path = Path("/opt/PX4-Autopilot/src/modules/simulation/gz_bridge/CMakeLists.txt")
 text = path.read_text()
 old_default = "COMMAND ${CMAKE_COMMAND} -E env PX4_SIM_MODEL=gz_${model_name} GZ_IP=127.0.0.1 $<TARGET_FILE:px4>"
