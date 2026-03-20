@@ -19,6 +19,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [PX4 Telemetry Check Script](./scripts/check-px4-telemetry.sh)
 - [Camera Bridge Check Script](./scripts/check-camera-bridge.sh)
 - [Camera Subscriber Check Script](./scripts/check-camera-subscriber.sh)
+- [Vehicle Command Check Script](./scripts/check-vehicle-command.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Current Slice
@@ -44,6 +45,8 @@ The current camera milestone is [check-camera-bridge.sh](./scripts/check-camera-
 - ROS 2 sees `/plane_01/camera/image_raw` and `/plane_01/camera/camera_info`.
 
 The next ROS-side proof is [check-camera-subscriber.sh](./scripts/check-camera-subscriber.sh). It builds the minimal `iconom_vision` package in `ros2_ws`, launches a subscriber in `ros2_app`, and verifies that one bridged image frame is actually received.
+
+The next control-side proof is [check-vehicle-command.sh](./scripts/check-vehicle-command.sh). It builds the minimal `iconom_control` package in `ros2_ws`, publishes one `VehicleCommand` on `/plane_01/fmu/in/vehicle_command`, and requires a matching `VehicleCommandAck` on `/plane_01/fmu/out/vehicle_command_ack`.
 
 ## Local Gazebo GUI
 
@@ -71,5 +74,5 @@ Freeze the minimum set of architectural decisions required to let future coding 
 With phase-0 decisions and guardrails in place, the next work should be:
 
 1. stabilize the first camera/ROS bridge path as a maintained phase-1 baseline,
-2. decide whether the aircraft GUI path should also be routed through the PX4 runtime milestone,
+2. stabilize the first ROS command roundtrip as a maintained phase-1 baseline,
 3. reconcile the PX4-native bring-up path with the standalone `gazebo` service for a fully separated runtime.

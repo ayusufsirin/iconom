@@ -68,6 +68,8 @@ services:
       CAMERA_INFO_TOPIC: ${CAMERA_INFO_TOPIC:-/plane_01/camera/camera_info}
       PX4_TELEMETRY_TOPIC: ${PX4_TELEMETRY_TOPIC:-/plane_01/fmu/out/vehicle_status}
       PX4_TELEMETRY_TOPIC_PREFIX: ${PX4_TELEMETRY_TOPIC_PREFIX:-/plane_01/fmu/out}
+      PX4_COMMAND_TOPIC: ${PX4_COMMAND_TOPIC:-/plane_01/fmu/in/vehicle_command}
+      PX4_COMMAND_ACK_TOPIC: ${PX4_COMMAND_ACK_TOPIC:-/plane_01/fmu/out/vehicle_command_ack}
     depends_on:
       xrce_agent:
         condition: service_started
