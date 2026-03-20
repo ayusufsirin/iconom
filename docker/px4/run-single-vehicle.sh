@@ -21,6 +21,7 @@ cd /opt/PX4-Autopilot
 echo "starting PX4 single-vehicle runtime"
 echo "  vehicle namespace: ${ICONOM_VEHICLE_NAMESPACE}"
 echo "  px4 namespace: ${PX4_UXRCE_DDS_NS}"
+echo "  xrce agent host: ${PX4_UXRCE_DDS_HOST:-127.0.0.1}"
 echo "  px4 model: ${PX4_SIM_MODEL}"
 echo "  px4 world: ${PX4_GZ_WORLD:-default}"
 echo "  headless: ${PX4_HEADLESS:-1}"
@@ -32,5 +33,6 @@ exec env \
   PX4_SYS_AUTOSTART="${PX4_SYS_AUTOSTART:-4003}" \
   PX4_GZ_WORLD="${PX4_GZ_WORLD:-default}" \
   PX4_SIM_MODEL="${PX4_SIM_MODEL:-gz_rc_cessna}" \
+  PX4_UXRCE_DDS_HOST="${PX4_UXRCE_DDS_HOST:-xrce_agent}" \
   PX4_UXRCE_DDS_NS="${PX4_UXRCE_DDS_NS:-plane_01}" \
   make px4_sitl gz_rc_cessna

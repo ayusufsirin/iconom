@@ -8,7 +8,7 @@ if [[ ! -x "${PX4_BIN}" ]]; then
   exit 20
 fi
 
-"${PX4_BIN}" --help >/dev/null
+"${PX4_BIN}" -h >/dev/null
 
 if [[ "$#" -gt 0 ]]; then
   exec "$@"

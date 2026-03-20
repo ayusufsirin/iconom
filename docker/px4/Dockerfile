@@ -29,6 +29,22 @@ RUN git clone --branch "${PX4_GIT_REF}" --depth 1 --recursive https://github.com
 
 WORKDIR /opt/PX4-Autopilot
 
+RUN python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/opt/PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/rcS")
+old = "uxrce_dds_client start -t udp -h 127.0.0.1 -p $uxrce_dds_port $uxrce_dds_ns"
+new = "uxrce_dds_client start -t udp -h ${PX4_UXRCE_DDS_HOST:-127.0.0.1} -p $uxrce_dds_port $uxrce_dds_ns"
+text = path.read_text()
+
+if old not in text:
+    raise SystemExit(f"expected rcS line not found in {path}")
+
+path.write_text(text.replace(old, new, 1))
+PY
+
+RUN grep -n '\${PX4_UXRCE_DDS_HOST:-127.0.0.1}' /opt/PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/rcS
+
 RUN bash ./Tools/setup/ubuntu.sh --no-sim-tools --no-nuttx \
  && make px4_sitl_default
 
@@ -43,6 +59,7 @@ ENV GZ_VERSION=harmonic
 ENV PX4_HEADLESS=1
 ENV PX4_SYS_AUTOSTART=4003
 ENV PX4_GZ_WORLD=default
+ENV PX4_UXRCE_DDS_HOST=xrce_agent
 ENV PX4_UXRCE_DDS_NS=plane_01
 ENV UXRCE_DDS_KEY=1
 ENV XRCE_AGENT_UDP_PORT=8888

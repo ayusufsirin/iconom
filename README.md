@@ -15,6 +15,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Smoke Script](./scripts/smoke.sh)
 - [Single-Vehicle Integration Script](./scripts/integration-single-vehicle.sh)
 - [Single-Vehicle Bring-Up Script](./scripts/bringup-single-vehicle.sh)
+- [PX4 Telemetry Check Script](./scripts/check-px4-telemetry.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Current Slice
@@ -26,6 +27,10 @@ This repo requires Docker Compose v2 via `docker compose`.
 The first integrated baseline is now `plane_01` via [integration-single-vehicle.sh](./scripts/integration-single-vehicle.sh). It validates the shared one-vehicle launch contract without claiming full PX4-in-Gazebo vehicle runtime yet.
 
 The first actual one-vehicle runtime attempt is [bringup-single-vehicle.sh](./scripts/bringup-single-vehicle.sh). It launches PX4's native `gz_rc_cessna` Gazebo path inside the `px4` container while `xrce_agent` and `ros2_app` run as companion services.
+
+The next narrow milestone is [check-px4-telemetry.sh](./scripts/check-px4-telemetry.sh), which attempts to observe one PX4 telemetry topic under `/plane_01/fmu/out/...` during the current runtime path.
+
+For this telemetry step, the ROS workspace now carries a pinned [px4_msgs.repos](./ros2_ws/src/px4_msgs.repos) manifest so `ros2_app` can build the minimum PX4 message package needed for telemetry type and topic discovery.
 
 ## Local Gazebo GUI
 
