@@ -22,6 +22,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Vehicle Command Check Script](./scripts/check-vehicle-command.sh)
 - [Mode Command Check Script](./scripts/check-mode-command.sh)
 - [Offboard Readiness Check Script](./scripts/check-offboard-readiness.sh)
+- [Offboard Movement Check Script](./scripts/check-offboard-movement.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Current Slice
@@ -62,6 +63,10 @@ The first validated mode for this phase-1 baseline is `mode_loiter`, which maps 
 The next control proof is [check-offboard-readiness.sh](./scripts/check-offboard-readiness.sh). It starts a repo-owned offboard hold publisher, streams `OffboardControlMode` plus `TrajectorySetpoint` on `/plane_01/fmu/in/...`, requests `mode_offboard`, and requires `VehicleStatus.nav_state=14`.
 
 The current offboard milestone is intentionally narrow: it proves offboard entry readiness and a steady hold-style setpoint stream. It does not yet claim waypointing, trajectory logic, or fixed-wing mission behavior.
+
+The next control proof is [check-offboard-movement.sh](./scripts/check-offboard-movement.sh). It uses a fixed-wing-compatible offboard primitive, `body_rate + thrust`, requests `mode_offboard`, and requires a bounded planar `VehicleLocalPosition` response while `VehicleStatus` remains in `nav_state=14`.
+
+This movement result matters because fixed-wing position-style offboard from rest remains grounded by PX4's landed handling. The first real movement primitive in this SITL baseline is therefore rate/thrust offboard, not a position-step takeoff.
 
 ## Local Gazebo GUI
 

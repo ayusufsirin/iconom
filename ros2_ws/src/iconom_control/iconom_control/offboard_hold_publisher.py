@@ -33,6 +33,13 @@ class OffboardHoldPublisher(Node):
         self.run_duration_sec = float(
             os.environ.get("PX4_OFFBOARD_RUN_DURATION_SEC", "30.0")
         )
+        self.step_delay_sec = float(
+            os.environ.get("PX4_OFFBOARD_STEP_DELAY_SEC", "0.0")
+        )
+        self.delta_x = float(os.environ.get("PX4_OFFBOARD_DELTA_X", "0.0"))
+        self.delta_y = float(os.environ.get("PX4_OFFBOARD_DELTA_Y", "0.0"))
+        self.delta_z = float(os.environ.get("PX4_OFFBOARD_DELTA_Z", "0.0"))
+        self.delta_yaw = float(os.environ.get("PX4_OFFBOARD_DELTA_YAW", "0.0"))
 
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -59,8 +66,8 @@ class OffboardHoldPublisher(Node):
         self.start_time = time.monotonic()
         self.setpoint_initialized = False
         self.last_local_position_summary = "no vehicle_local_position received"
-        self.setpoint_position = [math.nan, math.nan, math.nan]
-        self.setpoint_yaw = math.nan
+        self.seed_position = [math.nan, math.nan, math.nan]
+        self.seed_yaw = math.nan
         self.publish_count = 0
         self.finished = False
         self.failed = False
@@ -72,7 +79,9 @@ class OffboardHoldPublisher(Node):
         self.get_logger().info(
             f"waiting on {self.local_position_topic} to seed offboard hold setpoints; "
             f"publishing to {self.offboard_topic} and {self.trajectory_topic} at "
-            f"{self.publish_rate_hz:.1f}Hz for {self.run_duration_sec:.1f}s"
+            f"{self.publish_rate_hz:.1f}Hz for {self.run_duration_sec:.1f}s "
+            f"with movement delta x={self.delta_x:.1f} y={self.delta_y:.1f} "
+            f"z={self.delta_z:.1f} yaw={self.delta_yaw:.2f} after {self.step_delay_sec:.1f}s"
         )
 
     def _handle_local_position(self, message: VehicleLocalPosition) -> None:
@@ -86,8 +95,8 @@ class OffboardHoldPublisher(Node):
             return
 
         if not self.setpoint_initialized:
-            self.setpoint_position = [float(message.x), float(message.y), float(message.z)]
-            self.setpoint_yaw = float(message.heading)
+            self.seed_position = [float(message.x), float(message.y), float(message.z)]
+            self.seed_yaw = float(message.heading)
             self.setpoint_initialized = True
             self.get_logger().info(
                 "seeded offboard hold setpoint from local position "
@@ -132,13 +141,23 @@ class OffboardHoldPublisher(Node):
         return message
 
     def _build_trajectory_setpoint(self) -> TrajectorySetpoint:
+        elapsed_sec = time.monotonic() - self.start_time
+        position = list(self.seed_position)
+        yaw = self.seed_yaw
+
+        if elapsed_sec >= self.step_delay_sec:
+            position[0] += self.delta_x
+            position[1] += self.delta_y
+            position[2] += self.delta_z
+            yaw += self.delta_yaw
+
         message = TrajectorySetpoint()
         message.timestamp = self.get_clock().now().nanoseconds // 1000
-        message.position = self.setpoint_position
+        message.position = position
         message.velocity = [math.nan, math.nan, math.nan]
         message.acceleration = [math.nan, math.nan, math.nan]
         message.jerk = [math.nan, math.nan, math.nan]
-        message.yaw = self.setpoint_yaw
+        message.yaw = yaw
         message.yawspeed = math.nan
         return message
 
