@@ -21,6 +21,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Camera Subscriber Check Script](./scripts/check-camera-subscriber.sh)
 - [Vehicle Command Check Script](./scripts/check-vehicle-command.sh)
 - [Mode Command Check Script](./scripts/check-mode-command.sh)
+- [Offboard Readiness Check Script](./scripts/check-offboard-readiness.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Current Slice
@@ -57,6 +58,10 @@ The control check now supports both `disarm` and `arm` via `PX4_COMMAND_NAME`. F
 The next control proof is [check-mode-command.sh](./scripts/check-mode-command.sh). It waits for a preflight-ready `VehicleStatus`, arms through the existing command path, publishes one ROS-side mode request, and requires the resulting `VehicleStatus.nav_state` change on `/plane_01/fmu/out/vehicle_status_v1`.
 
 The first validated mode for this phase-1 baseline is `mode_loiter`, which maps to `NAVIGATION_STATE_AUTO_LOITER`. `STAB` is intentionally not the first validated mode because PX4 requires manual-control availability for that mode in this SITL state.
+
+The next control proof is [check-offboard-readiness.sh](./scripts/check-offboard-readiness.sh). It starts a repo-owned offboard hold publisher, streams `OffboardControlMode` plus `TrajectorySetpoint` on `/plane_01/fmu/in/...`, requests `mode_offboard`, and requires `VehicleStatus.nav_state=14`.
+
+The current offboard milestone is intentionally narrow: it proves offboard entry readiness and a steady hold-style setpoint stream. It does not yet claim waypointing, trajectory logic, or fixed-wing mission behavior.
 
 ## Local Gazebo GUI
 

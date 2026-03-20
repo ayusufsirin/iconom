@@ -82,6 +82,11 @@ class VehicleCommandClient(Node):
                 VehicleCommand.VEHICLE_CMD_SET_NAV_STATE,
                 float(VehicleStatus.NAVIGATION_STATE_AUTO_LOITER),
             )
+        if command_name == "mode_offboard":
+            return (
+                VehicleCommand.VEHICLE_CMD_SET_NAV_STATE,
+                float(VehicleStatus.NAVIGATION_STATE_OFFBOARD),
+            )
         raise ValueError(f"unsupported PX4_COMMAND_NAME={command_name!r}")
 
     def _result_label(self, result: int) -> str:

@@ -27,6 +27,8 @@ This document defines the first honest single-vehicle integration baseline.
 - The current command slice validates both `disarm` and `arm` actions for `plane_01`.
 - `scripts/check-mode-command.sh` validates the first ROS-side mode slice by waiting for preflight-ready `VehicleStatus`, arming, publishing a mode request, and confirming the resulting `VehicleStatus.nav_state`.
 - The first validated phase-1 mode is `mode_loiter`, which maps to `NAVIGATION_STATE_AUTO_LOITER` and is observed on `/plane_01/fmu/out/vehicle_status_v1`.
+- `scripts/check-offboard-readiness.sh` validates the first ROS-side offboard slice by streaming `OffboardControlMode` plus a hold-style `TrajectorySetpoint`, requesting `mode_offboard`, and confirming `VehicleStatus.nav_state=14`.
+- `ros2_ws/src/iconom_control/iconom_control/offboard_hold_publisher.py` contains the first repo-owned offboard publisher for the control slice.
 - The current `gz_rc_cessna` phase-1 baseline explicitly overrides two PX4 airframe defaults to make headless SITL arming achievable:
   - `NAV_DLL_ACT=0`
   - `SYS_HAS_NUM_ASPD=0`
@@ -39,4 +41,5 @@ This document defines the first honest single-vehicle integration baseline.
 - The integrated aircraft GUI path is local-host-only for now and still depends on X11 passthrough in the override stack.
 - The current camera bridge path is a truthful milestone, but it is still a transitional integration shape rather than the final separated runtime architecture.
 - `NAVIGATION_STATE_STAB` is not used as the first validated mode because PX4 requires manual-control availability for it in the current SITL state.
+- The current offboard milestone proves entry readiness and a basic hold stream only; it does not yet prove waypointing, fixed-wing trajectory behavior, or mission logic.
 - The full fixed-wing autonomy target is still incomplete.

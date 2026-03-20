@@ -20,6 +20,7 @@ setup(
         "console_scripts": [
             "vehicle_command_client = iconom_control.vehicle_command_client:main",
             "vehicle_status_waiter = iconom_control.vehicle_status_waiter:main",
+            "offboard_hold_publisher = iconom_control.offboard_hold_publisher:main",
         ],
     },
 )
