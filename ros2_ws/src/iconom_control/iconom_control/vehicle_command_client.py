@@ -4,7 +4,7 @@ import sys
 import time
 
 import rclpy
-from px4_msgs.msg import VehicleCommand, VehicleCommandAck
+from px4_msgs.msg import VehicleCommand, VehicleCommandAck, VehicleStatus
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 
@@ -71,6 +71,16 @@ class VehicleCommandClient(Node):
             return (
                 VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM,
                 float(VehicleCommand.ARMING_ACTION_ARM),
+            )
+        if command_name == "mode_stabilized":
+            return (
+                VehicleCommand.VEHICLE_CMD_SET_NAV_STATE,
+                float(VehicleStatus.NAVIGATION_STATE_STAB),
+            )
+        if command_name == "mode_loiter":
+            return (
+                VehicleCommand.VEHICLE_CMD_SET_NAV_STATE,
+                float(VehicleStatus.NAVIGATION_STATE_AUTO_LOITER),
             )
         raise ValueError(f"unsupported PX4_COMMAND_NAME={command_name!r}")
 

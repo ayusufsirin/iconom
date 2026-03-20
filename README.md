@@ -20,6 +20,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Camera Bridge Check Script](./scripts/check-camera-bridge.sh)
 - [Camera Subscriber Check Script](./scripts/check-camera-subscriber.sh)
 - [Vehicle Command Check Script](./scripts/check-vehicle-command.sh)
+- [Mode Command Check Script](./scripts/check-mode-command.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Current Slice
@@ -52,6 +53,10 @@ The control check now supports both `disarm` and `arm` via `PX4_COMMAND_NAME`. F
 
 - `NAV_DLL_ACT=0`
 - `SYS_HAS_NUM_ASPD=0`
+
+The next control proof is [check-mode-command.sh](./scripts/check-mode-command.sh). It waits for a preflight-ready `VehicleStatus`, arms through the existing command path, publishes one ROS-side mode request, and requires the resulting `VehicleStatus.nav_state` change on `/plane_01/fmu/out/vehicle_status_v1`.
+
+The first validated mode for this phase-1 baseline is `mode_loiter`, which maps to `NAVIGATION_STATE_AUTO_LOITER`. `STAB` is intentionally not the first validated mode because PX4 requires manual-control availability for that mode in this SITL state.
 
 ## Local Gazebo GUI
 

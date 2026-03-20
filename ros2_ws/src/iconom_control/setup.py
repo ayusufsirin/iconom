@@ -19,6 +19,7 @@ setup(
     entry_points={
         "console_scripts": [
             "vehicle_command_client = iconom_control.vehicle_command_client:main",
+            "vehicle_status_waiter = iconom_control.vehicle_status_waiter:main",
         ],
     },
 )
