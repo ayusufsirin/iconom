@@ -20,6 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     > /etc/apt/sources.list.d/gazebo-stable.list \
  && apt-get update && apt-get install -y --no-install-recommends \
     gz-harmonic \
+    libgstreamer-plugins-base1.0-dev \
+    libgstreamer1.0-dev \
     libopencv-dev \
  && rm -rf /var/lib/apt/lists/*
 
@@ -44,6 +46,42 @@ path.write_text(text.replace(old, new, 1))
 PY
 
 RUN grep -n '\${PX4_UXRCE_DDS_HOST:-127.0.0.1}' /opt/PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/rcS
+
+RUN python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/opt/PX4-Autopilot/Tools/simulation/gz/models/rc_cessna/model.sdf")
+anchor = "    <link name=\"airspeed\">"
+insert = """    <include merge='true'>\n      <uri>model://mono_cam</uri>\n      <pose>0.24 0 0.02 0 0 0</pose>\n    </include>\n    <joint name=\"camera_joint\" type=\"fixed\">\n      <parent>base_link</parent>\n      <child>camera_link</child>\n      <pose relative_to=\"base_link\">0.24 0 0.02 0 0 0</pose>\n    </joint>\n    <link name=\"airspeed\">"""
+text = path.read_text()
+
+if anchor not in text:
+    raise SystemExit(f"expected rc_cessna insertion point not found in {path}")
+
+path.write_text(text.replace(anchor, insert, 1))
+PY
+
+RUN grep -n 'model://mono_cam' /opt/PX4-Autopilot/Tools/simulation/gz/models/rc_cessna/model.sdf \
+ && grep -n 'camera_joint' /opt/PX4-Autopilot/Tools/simulation/gz/models/rc_cessna/model.sdf
+
+RUN python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/opt/PX4-Autopilot/src/modules/simulation/gz_bridge/CMakeLists.txt")
+text = path.read_text()
+old_default = "COMMAND ${CMAKE_COMMAND} -E env PX4_SIM_MODEL=gz_${model_name} GZ_IP=127.0.0.1 $<TARGET_FILE:px4>"
+new_default = "COMMAND ${CMAKE_COMMAND} -E env PX4_SIM_MODEL=gz_${model_name} GZ_IP=$$GZ_IP $<TARGET_FILE:px4>"
+old_world = "COMMAND ${CMAKE_COMMAND} -E env PX4_SIM_MODEL=gz_${model_name} PX4_GZ_WORLD=${world_name} GZ_IP=127.0.0.1 $<TARGET_FILE:px4>"
+new_world = "COMMAND ${CMAKE_COMMAND} -E env PX4_SIM_MODEL=gz_${model_name} PX4_GZ_WORLD=${world_name} GZ_IP=$$GZ_IP $<TARGET_FILE:px4>"
+
+if old_default not in text or old_world not in text:
+    raise SystemExit(f"expected gz_bridge CMake launch lines not found in {path}")
+
+text = text.replace(old_default, new_default, 1).replace(old_world, new_world, 1)
+path.write_text(text)
+PY
+
+RUN grep -n '\$\$GZ_IP' /opt/PX4-Autopilot/src/modules/simulation/gz_bridge/CMakeLists.txt
 
 RUN bash ./Tools/setup/ubuntu.sh --no-sim-tools --no-nuttx \
  && make px4_sitl_default

@@ -16,11 +16,12 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Single-Vehicle Integration Script](./scripts/integration-single-vehicle.sh)
 - [Single-Vehicle Bring-Up Script](./scripts/bringup-single-vehicle.sh)
 - [PX4 Telemetry Check Script](./scripts/check-px4-telemetry.sh)
+- [Camera Bridge Check Script](./scripts/check-camera-bridge.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Current Slice
 
-All four service slices now exist: `xrce_agent`, `ros2_app`, `px4`, and `gazebo`. The remaining gap is full vehicle and sensor integration, not basic service availability.
+All four service slices now exist: `xrce_agent`, `ros2_app`, `px4`, and `gazebo`. The current integrated milestone is no longer basic service availability. The repo now has a truthful one-vehicle runtime, PX4 telemetry discovery, and a first Gazebo camera bridge into ROS 2.
 
 This repo requires Docker Compose v2 via `docker compose`.
 
@@ -31,6 +32,12 @@ The first actual one-vehicle runtime attempt is [bringup-single-vehicle.sh](./sc
 The next narrow milestone is [check-px4-telemetry.sh](./scripts/check-px4-telemetry.sh), which attempts to observe one PX4 telemetry topic under `/plane_01/fmu/out/...` during the current runtime path.
 
 For this telemetry step, the ROS workspace now carries a pinned [px4_msgs.repos](./ros2_ws/src/px4_msgs.repos) manifest so `ros2_app` can build the minimum PX4 message package needed for telemetry type and topic discovery.
+
+The current camera milestone is [check-camera-bridge.sh](./scripts/check-camera-bridge.sh). It validates one forward camera on the `gz_rc_cessna` runtime and proves that:
+
+- Gazebo publishes the live camera image and camera-info topics,
+- a `ros_gz_bridge` one-off container can join the live PX4 runtime network namespace,
+- ROS 2 sees `/plane_01/camera/image_raw` and `/plane_01/camera/camera_info`.
 
 ## Local Gazebo GUI
 
@@ -57,6 +64,6 @@ Freeze the minimum set of architectural decisions required to let future coding 
 
 With phase-0 decisions and guardrails in place, the next work should be:
 
-1. validate and stabilize the actual `gz_rc_cessna` one-vehicle bring-up path,
-2. add the first runtime ROS bridge and telemetry topic checks,
+1. stabilize the first camera/ROS bridge path as a maintained phase-1 baseline,
+2. decide whether the aircraft GUI path should also be routed through the PX4 runtime milestone,
 3. reconcile the PX4-native bring-up path with the standalone `gazebo` service for a fully separated runtime.
