@@ -45,12 +45,17 @@ fi
 
 cd "${PX4_WORKDIR}"
 
-exec env \
-  GZ_IP="${GZ_IP_VALUE}" \
-  HEADLESS="${PX4_HEADLESS:-1}" \
-  PX4_SYS_AUTOSTART="${PX4_SYS_AUTOSTART:-4003}" \
-  PX4_GZ_WORLD="${PX4_GZ_WORLD:-default}" \
-  PX4_SIM_MODEL="${PX4_SIM_MODEL:-gz_rc_cessna}" \
-  PX4_UXRCE_DDS_HOST="${PX4_UXRCE_DDS_HOST:-xrce_agent}" \
-  PX4_UXRCE_DDS_NS="${PX4_UXRCE_DDS_NS:-plane_01}" \
-  "${PX4_BINARY}"
+ENV_ARGS=(
+  GZ_IP="${GZ_IP_VALUE}"
+  PX4_SYS_AUTOSTART="${PX4_SYS_AUTOSTART:-4003}"
+  PX4_GZ_WORLD="${PX4_GZ_WORLD:-default}"
+  PX4_SIM_MODEL="${PX4_SIM_MODEL:-gz_rc_cessna}"
+  PX4_UXRCE_DDS_HOST="${PX4_UXRCE_DDS_HOST:-xrce_agent}"
+  PX4_UXRCE_DDS_NS="${PX4_UXRCE_DDS_NS:-plane_01}"
+)
+
+if [[ "${PX4_HEADLESS:-1}" == "1" ]]; then
+  ENV_ARGS+=(HEADLESS=1)
+fi
+
+exec env "${ENV_ARGS[@]}" "${PX4_BINARY}"

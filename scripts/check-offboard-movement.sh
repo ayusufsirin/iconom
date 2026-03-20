@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
+OVERRIDE_FILE="${ROOT_DIR}/docker-compose.override.yml"
 ENV_FILE="${ROOT_DIR}/.env.example"
 COMPOSE_CMD=(docker compose)
 PX4_LOG="${ROOT_DIR}/.tmp-px4-offboard-movement.log"
@@ -67,6 +68,19 @@ if [[ "${PX4_UXRCE_DDS_NS:-}" != "plane_01" ]]; then
 fi
 
 COMPOSE_ARGS=(--env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
+USE_GUI="${ICONOM_USE_GUI:-0}"
+
+if [[ "${USE_GUI}" == "1" || "${PX4_HEADLESS:-1}" == "0" ]]; then
+  require_file "${OVERRIDE_FILE}"
+
+  if [[ -z "${DISPLAY:-}" ]]; then
+    echo "DISPLAY is not set; GUI offboard movement requires a local X11 display" >&2
+    exit 133
+  fi
+
+  COMPOSE_ARGS+=(-f "${OVERRIDE_FILE}")
+fi
+
 trap cleanup EXIT
 
 COMMAND_TOPIC="${PX4_COMMAND_TOPIC:-/plane_01/fmu/in/vehicle_command}"
@@ -90,6 +104,7 @@ echo "local position topic: ${LOCAL_POSITION_TOPIC}"
 echo "offboard control mode topic: ${OFFBOARD_CONTROL_MODE_TOPIC}"
 echo "vehicle rates setpoint topic: ${VEHICLE_RATES_SETPOINT_TOPIC}"
 echo "thrust command: x=${OFFBOARD_THRUST_X}"
+echo "gui mode: ${USE_GUI}"
 echo
 echo "this checks the first ROS-side offboard movement slice:"
 echo "  - PX4 runtime starts"
