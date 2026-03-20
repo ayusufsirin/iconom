@@ -17,6 +17,7 @@ This document defines the first honest single-vehicle integration baseline.
 - `scripts/integration-single-vehicle.sh` validates the agreed namespace, model, world, and workspace assumptions inside the running containers.
 - `scripts/bringup-single-vehicle.sh` is the first actual runtime attempt for one PX4-backed aircraft in Gazebo.
 - `scripts/bringup-single-vehicle-gui.sh` is the local integrated aircraft GUI entrypoint for the current PX4 runtime path.
+- `scripts/phase1-launch.sh` is the canonical operator entrypoint for the maintained phase-1 runtime in headless or GUI mode.
 - `scripts/check-px4-telemetry.sh` is the first narrow telemetry discovery check for `/plane_01/fmu/out/...` during the current runtime path.
 - `ros2_ws/src/px4_msgs.repos` pins the minimum ROS-side PX4 message dependency for telemetry type visibility.
 - `scripts/check-camera-bridge.sh` validates the first camera slice by discovering Gazebo camera topics in the live PX4 runtime container and bridging them into ROS 2.
@@ -30,6 +31,7 @@ This document defines the first honest single-vehicle integration baseline.
 - `scripts/check-offboard-readiness.sh` validates the first ROS-side offboard slice by streaming `OffboardControlMode` plus a hold-style `TrajectorySetpoint`, requesting `mode_offboard`, and confirming `VehicleStatus.nav_state=14`.
 - `ros2_ws/src/iconom_control/iconom_control/offboard_hold_publisher.py` contains the first repo-owned offboard publisher for the control slice.
 - `scripts/check-offboard-movement.sh` validates the first ROS-side movement slice in `OFFBOARD` mode by streaming `body_rate + thrust`, confirming bounded planar `VehicleLocalPosition` motion, and verifying that `VehicleStatus` remains in `nav_state=14`.
+- `scripts/phase1-acceptance.sh` is the canonical maintained validation flow for phase 1 and chains the current telemetry, camera, command, mode, offboard-readiness, and offboard-movement checks.
 - `ros2_ws/src/iconom_control/iconom_control/offboard_rate_thrust_publisher.py` contains the first repo-owned fixed-wing-compatible movement publisher for the control slice.
 - `ros2_ws/src/iconom_control/iconom_control/vehicle_local_position_waiter.py` contains the first repo-owned local-position response validator for the movement slice.
 - The current `gz_rc_cessna` phase-1 baseline explicitly overrides two PX4 airframe defaults to make headless SITL arming achievable:
@@ -48,3 +50,10 @@ This document defines the first honest single-vehicle integration baseline.
 - The first real offboard movement primitive in this SITL baseline is `body_rate + thrust`, not a position-step takeoff.
 - The movement slice still does not prove waypointing, fixed-wing trajectory behavior, or mission logic.
 - The full fixed-wing autonomy target is still incomplete.
+
+## Canonical Entry Points
+
+- Use `scripts/phase1-launch.sh --headless` for the maintained headless operator path.
+- Use `scripts/phase1-launch.sh --gui` for the maintained integrated aircraft GUI path.
+- Use `scripts/phase1-acceptance.sh --headless` for the maintained CI-style acceptance flow.
+- Use `scripts/phase1-acceptance.sh --gui` for the maintained local GUI-backed acceptance flow.

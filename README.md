@@ -16,6 +16,8 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Single-Vehicle Integration Script](./scripts/integration-single-vehicle.sh)
 - [Single-Vehicle Bring-Up Script](./scripts/bringup-single-vehicle.sh)
 - [Single-Vehicle GUI Bring-Up Script](./scripts/bringup-single-vehicle-gui.sh)
+- [Phase 1 Launch Script](./scripts/phase1-launch.sh)
+- [Phase 1 Acceptance Script](./scripts/phase1-acceptance.sh)
 - [PX4 Telemetry Check Script](./scripts/check-px4-telemetry.sh)
 - [Camera Bridge Check Script](./scripts/check-camera-bridge.sh)
 - [Camera Subscriber Check Script](./scripts/check-camera-subscriber.sh)
@@ -36,6 +38,10 @@ The first integrated baseline is now `plane_01` via [integration-single-vehicle.
 The first actual one-vehicle runtime attempt is [bringup-single-vehicle.sh](./scripts/bringup-single-vehicle.sh). It launches PX4's native `gz_rc_cessna` Gazebo path inside the `px4` container while `xrce_agent` and `ros2_app` run as companion services.
 
 The local integrated aircraft GUI path is [bringup-single-vehicle-gui.sh](./scripts/bringup-single-vehicle-gui.sh). It uses the local override stack to route X11 into the `px4` runtime and forces `PX4_HEADLESS=0`.
+
+The canonical operator entrypoint is now [phase1-launch.sh](./scripts/phase1-launch.sh). It selects the maintained phase-1 runtime path in either headless or GUI mode without changing the underlying one-vehicle contract.
+
+The canonical validation entrypoint is now [phase1-acceptance.sh](./scripts/phase1-acceptance.sh). It chains the maintained phase-1 checks for telemetry, camera bridge, camera subscriber, command path, mode change, offboard readiness, and offboard movement.
 
 The next narrow milestone is [check-px4-telemetry.sh](./scripts/check-px4-telemetry.sh), which attempts to observe one PX4 telemetry topic under `/plane_01/fmu/out/...` during the current runtime path.
 
@@ -85,6 +91,34 @@ To force the canonical headless path even on the local host:
 docker compose -f docker-compose.yml up gazebo
 ```
 
+## Phase 1 Daily Use
+
+Headless launch:
+
+```bash
+./scripts/phase1-launch.sh --headless
+```
+
+Integrated aircraft GUI launch:
+
+```bash
+xhost +local:docker
+./scripts/phase1-launch.sh --gui
+```
+
+Headless acceptance:
+
+```bash
+./scripts/phase1-acceptance.sh --headless
+```
+
+GUI acceptance:
+
+```bash
+xhost +local:docker
+./scripts/phase1-acceptance.sh --gui
+```
+
 ## Phase 0 Goal
 
 Freeze the minimum set of architectural decisions required to let future coding agents work in isolation without redefining the project on every task.
@@ -93,6 +127,6 @@ Freeze the minimum set of architectural decisions required to let future coding 
 
 With phase-0 decisions and guardrails in place, the next work should be:
 
-1. stabilize the first camera/ROS bridge path as a maintained phase-1 baseline,
-2. stabilize the first ROS command roundtrip as a maintained phase-1 baseline,
-3. reconcile the PX4-native bring-up path with the standalone `gazebo` service for a fully separated runtime.
+1. keep the phase-1 launch and acceptance entrypoints stable,
+2. reconcile the PX4-native bring-up path with the standalone `gazebo` service for a fully separated runtime,
+3. use the stabilized phase-1 baseline as the handoff point into phase 2.
