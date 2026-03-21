@@ -16,7 +16,7 @@ Phase 2 proved that the maintained single-vehicle runtime is stable:
 - offboard entry and bounded movement are validated,
 - GUI and headless operator flows both work.
 
-What is still missing is a higher-level fixed-wing guidance behavior that is more meaningful than raw `body_rate + thrust`.
+What is still missing is a higher-level fixed-wing guidance progression that is more meaningful than raw `body_rate + thrust`.
 
 Phase 3 exists to add that first guidance layer without yet turning the project into a mission-planning or swarm problem.
 
@@ -77,7 +77,7 @@ Why this became the correct first step:
 - it gets the aircraft into a meaningful guided flight state,
 - it is a safer first proof than jumping directly into freer waypoint behavior from rest.
 
-This does not replace later waypoint or loiter guidance. It establishes the first honest higher-level primitive above the phase-2 offboard movement layer.
+This does not replace later loiter or waypoint guidance. It establishes the first honest higher-level primitive above the phase-2 offboard movement layer.
 
 ## Recommended Technical Direction
 
@@ -185,7 +185,7 @@ Phase 3 is complete when all of the following are true:
 - the primitive can be observed in the GUI runtime,
 - the work does not introduce multi-vehicle assumptions.
 
-The current slice satisfies these criteria for the first bounded `NAV_TAKEOFF` primitive.
+The current maintained phase-3 slice satisfies these criteria for a bounded airborne guidance chain: `NAV_TAKEOFF` followed by in-flight `AUTO_LOITER`.
 
 ## Risks
 
@@ -206,7 +206,25 @@ Phase-3 completion should leave the repo with:
 - updated documentation
 - one clear success metric for the behavior
 
-The next likely phase-3 increment after this first primitive is airborne loiter or waypoint behavior after takeoff, not a return to raw offboard movement as the main abstraction.
+The next likely phase-3 increment after this maintained loiter slice is waypoint behavior after loiter is stable, not a return to raw offboard movement as the main abstraction.
+
+## Current Increment
+
+The current post-takeoff increment is airborne loiter after takeoff.
+
+This extends the first bounded `NAV_TAKEOFF` primitive without jumping to full route following:
+
+- the aircraft first enters a meaningful PX4-native takeoff state,
+- then transitions into PX4-native loiter guidance while airborne,
+- the success signal is still telemetry-based and bounded.
+
+Current result:
+
+- [check-nav-loiter.sh](../scripts/check-nav-loiter.sh) exists,
+- it proves `NAV_TAKEOFF` followed by an in-flight `mode_loiter` request,
+- it requires `VehicleStatus.nav_state=AUTO_LOITER`,
+- it verifies continued `VehicleLocalPosition` motion while loiter remains active,
+- [phase3-acceptance.sh](../scripts/phase3-acceptance.sh) now uses the loiter slice as the maintained phase-3 validation entrypoint.
 
 ## Initial Next Step
 

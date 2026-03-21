@@ -29,6 +29,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Offboard Readiness Check Script](./scripts/check-offboard-readiness.sh)
 - [Offboard Movement Check Script](./scripts/check-offboard-movement.sh)
 - [Nav Takeoff Check Script](./scripts/check-nav-takeoff.sh)
+- [Nav Loiter Check Script](./scripts/check-nav-loiter.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Current Slice
@@ -80,7 +81,9 @@ This movement result matters because fixed-wing position-style offboard from res
 
 The first phase-3 guidance proof is [check-nav-takeoff.sh](./scripts/check-nav-takeoff.sh). It uses a PX4-native navigation command instead of raw offboard motion, seeds a bounded target from live `/plane_01/fmu/out/vehicle_global_position`, sends `NAV_TAKEOFF`, and requires both `VehicleStatus.nav_state=AUTO_TAKEOFF` and real takeoff motion in `VehicleLocalPosition`.
 
-The canonical validation entrypoint for the current phase-3 slice is [phase3-acceptance.sh](./scripts/phase3-acceptance.sh). It runs the maintained `NAV_TAKEOFF` guidance proof in either headless or GUI mode.
+The next phase-3 guidance proof is [check-nav-loiter.sh](./scripts/check-nav-loiter.sh). It chains a bounded `NAV_TAKEOFF` into an in-flight `mode_loiter` transition, requires `VehicleStatus.nav_state=AUTO_LOITER`, and verifies continued motion while PX4 remains in loiter guidance.
+
+The canonical validation entrypoint for the current phase-3 slice is [phase3-acceptance.sh](./scripts/phase3-acceptance.sh). It now runs the maintained airborne loiter proof in either headless or GUI mode.
 
 ## Local Gazebo GUI
 
@@ -158,4 +161,4 @@ Phase 3 starts from the tagged `phase2-runtime-separation` state and keeps the s
 
 The current phase-3 source of truth is [phase-3-plan.md](./docs/phase-3-plan.md).
 
-The first validated phase-3 primitive is PX4-native `NAV_TAKEOFF`. The next likely phase-3 increment is an airborne loiter or waypoint-style guidance behavior after takeoff.
+The validated phase-3 guidance chain is now PX4-native `NAV_TAKEOFF` followed by airborne `mode_loiter`. The likely next step after this bounded loiter proof is waypoint-style guidance behavior after loiter is stable.
