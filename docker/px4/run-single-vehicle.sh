@@ -18,7 +18,12 @@ fi
 
 cd /opt/PX4-Autopilot
 
-GZ_IP_VALUE="${GZ_IP:-$(hostname -I | awk '{print $1}')}"
+if [[ -n "${GZ_IP:-}" ]]; then
+  GZ_IP_VALUE="${GZ_IP}"
+else
+  GZ_IP_VALUE="$(hostname -I | awk '{print $1}')"
+fi
+
 if [[ -z "${GZ_IP_VALUE}" ]]; then
   echo "failed to determine Gazebo transport IP for the px4 container" >&2
   exit 44
@@ -29,11 +34,20 @@ echo "  vehicle namespace: ${ICONOM_VEHICLE_NAMESPACE}"
 echo "  px4 namespace: ${PX4_UXRCE_DDS_NS}"
 echo "  xrce agent host: ${PX4_UXRCE_DDS_HOST:-127.0.0.1}"
 echo "  gazebo transport ip: ${GZ_IP_VALUE}"
+if [[ "${PX4_GZ_STANDALONE:-0}" == "1" ]]; then
+  echo "  gazebo transport host: ${PX4_GZ_HOSTNAME:-gazebo}"
+fi
 echo "  px4 model: ${PX4_SIM_MODEL}"
 echo "  px4 world: ${PX4_GZ_WORLD:-default}"
 echo "  headless: ${PX4_HEADLESS:-1}"
 echo "  autostart: ${PX4_SYS_AUTOSTART:-4003}"
-echo "this uses PX4's native Gazebo launch path inside the px4 container for the first real runtime milestone"
+echo "  standalone gazebo: ${PX4_GZ_STANDALONE:-0}"
+
+if [[ "${PX4_GZ_STANDALONE:-0}" == "1" ]]; then
+  echo "this uses an external Gazebo runtime owned by the gazebo service"
+else
+  echo "this uses PX4's native Gazebo launch path inside the px4 container for the first real runtime milestone"
+fi
 
 PX4_BINARY="/opt/PX4-Autopilot/build/px4_sitl_default/bin/px4"
 PX4_WORKDIR="/opt/PX4-Autopilot/build/px4_sitl_default/src/modules/simulation/gz_bridge"
@@ -56,6 +70,10 @@ ENV_ARGS=(
 
 if [[ "${PX4_HEADLESS:-1}" == "1" ]]; then
   ENV_ARGS+=(HEADLESS=1)
+fi
+
+if [[ "${PX4_GZ_STANDALONE:-0}" == "1" ]]; then
+  ENV_ARGS+=(PX4_GZ_STANDALONE=1)
 fi
 
 exec env "${ENV_ARGS[@]}" "${PX4_BINARY}"

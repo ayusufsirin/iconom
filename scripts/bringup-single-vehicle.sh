@@ -64,21 +64,21 @@ echo "px4 namespace: ${PX4_UXRCE_DDS_NS}"
 echo "px4 model: ${PX4_SIM_MODEL}"
 echo "px4 world: ${PX4_GZ_WORLD:-default}"
 echo
-echo "this is the first actual runtime attempt."
-echo "it starts xrce_agent and ros2_app as companion services, then launches PX4's native Gazebo path inside the px4 container."
-echo "the standalone gazebo service is not the runtime backend for this milestone yet."
+echo "this is the maintained single-vehicle runtime path."
+echo "it starts gazebo as the simulator owner, keeps xrce_agent and ros2_app as companion services,"
+echo "and launches PX4 in standalone Gazebo-attachment mode."
 echo
 echo "step 1: validating compose config"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" config >/dev/null
 
 echo "step 2: building required services"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app px4
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app gazebo px4
 
-echo "step 3: starting xrce_agent and ros2_app"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d xrce_agent ros2_app
+echo "step 3: starting gazebo, xrce_agent, and ros2_app"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d gazebo xrce_agent ros2_app
 
 RUNNING_SERVICES="$("${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" ps --services --status running)"
-for service in xrce_agent ros2_app; do
+for service in gazebo xrce_agent ros2_app; do
   if ! grep -qx "${service}" <<<"${RUNNING_SERVICES}"; then
     echo "${service} did not reach running state before bring-up" >&2
     "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs "${service}" || true
@@ -86,10 +86,12 @@ for service in xrce_agent ros2_app; do
   fi
 done
 
-echo "step 4: launching the actual PX4-in-Gazebo runtime attempt"
+echo "step 4: launching PX4 against the external Gazebo runtime"
 echo "command: docker compose run --rm --no-deps px4 /usr/local/bin/px4-run-single-vehicle.sh"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" run --rm --no-deps \
   -e PX4_HEADLESS="${PX4_HEADLESS:-1}" \
+  -e PX4_GZ_STANDALONE=1 \
+  -e PX4_GZ_HOSTNAME=gazebo \
   -e PX4_SYS_AUTOSTART="${PX4_SYS_AUTOSTART:-4003}" \
   -e PX4_GZ_WORLD="${PX4_GZ_WORLD:-default}" \
   -e PX4_SIM_MODEL="${PX4_SIM_MODEL:-gz_rc_cessna}" \

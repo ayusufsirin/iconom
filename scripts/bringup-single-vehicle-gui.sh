@@ -73,20 +73,20 @@ echo "px4 world: ${PX4_GZ_WORLD:-default}"
 echo "display: ${DISPLAY}"
 echo
 echo "this is the integrated aircraft GUI path."
-echo "it uses the local override stack for X11 and forces PX4_HEADLESS=0."
-echo "the current runtime still launches Gazebo from inside the px4 container."
+echo "it uses the local override stack for X11, starts the standalone gazebo service,"
+echo "and forces PX4_HEADLESS=0 while PX4 attaches to that external runtime."
 echo
 echo "step 1: validating merged compose config"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" config >/dev/null
 
 echo "step 2: building required services"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app px4
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app gazebo px4
 
-echo "step 3: starting xrce_agent and ros2_app"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d xrce_agent ros2_app
+echo "step 3: starting gazebo, xrce_agent, and ros2_app"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d gazebo xrce_agent ros2_app
 
 RUNNING_SERVICES="$("${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" ps --services --status running)"
-for service in xrce_agent ros2_app; do
+for service in gazebo xrce_agent ros2_app; do
   if ! grep -qx "${service}" <<<"${RUNNING_SERVICES}"; then
     echo "${service} did not reach running state before GUI bring-up" >&2
     "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs "${service}" || true
@@ -94,10 +94,12 @@ for service in xrce_agent ros2_app; do
   fi
 done
 
-echo "step 4: launching the actual PX4-in-Gazebo GUI runtime"
+echo "step 4: launching PX4 against the external Gazebo GUI runtime"
 echo "command: docker compose run --rm --no-deps px4 /usr/local/bin/px4-run-single-vehicle.sh"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" run --rm --no-deps \
   -e PX4_HEADLESS=0 \
+  -e PX4_GZ_STANDALONE=1 \
+  -e PX4_GZ_HOSTNAME=gazebo \
   -e PX4_SYS_AUTOSTART="${PX4_SYS_AUTOSTART:-4003}" \
   -e PX4_GZ_WORLD="${PX4_GZ_WORLD:-default}" \
   -e PX4_SIM_MODEL="${PX4_SIM_MODEL:-gz_rc_cessna}" \

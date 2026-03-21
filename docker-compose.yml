@@ -7,6 +7,7 @@ services:
       dockerfile: docker/px4/Dockerfile
       args:
         PX4_GIT_REF: ${PX4_GIT_REF:-v1.16.0}
+    network_mode: "service:gazebo"
     environment:
       ICONOM_VEHICLE_NAMESPACE: ${ICONOM_VEHICLE_NAMESPACE:-plane_01}
       PX4_HEADLESS: ${PX4_HEADLESS:-1}
@@ -21,6 +22,8 @@ services:
       MAVLINK_OFFBOARD_BASE_PORT: ${MAVLINK_OFFBOARD_BASE_PORT:-14540}
       MAVLINK_GCS_PORT: ${MAVLINK_GCS_PORT:-14550}
     depends_on:
+      gazebo:
+        condition: service_started
       xrce_agent:
         condition: service_started
     restart: "no"
@@ -30,12 +33,14 @@ services:
     build:
       context: .
       dockerfile: docker/gazebo/Dockerfile
+      args:
+        PX4_GIT_REF: ${PX4_GIT_REF:-v1.16.0}
     environment:
       ICONOM_VEHICLE_NAMESPACE: ${ICONOM_VEHICLE_NAMESPACE:-plane_01}
       ROS_DISTRO: ${ROS_DISTRO:-humble}
       USE_SIM_TIME: ${USE_SIM_TIME:-true}
-      GZ_SIM_RESOURCE_PATH: ${GZ_SIM_RESOURCE_PATH:-/opt/iconom/sim}
-      GAZEBO_WORLD_FILE: ${GAZEBO_WORLD_FILE:-/opt/iconom/sim/worlds/empty.sdf}
+      GZ_SIM_RESOURCE_PATH: ${GZ_SIM_RESOURCE_PATH:-/opt/iconom/sim:/opt/PX4-Autopilot/Tools/simulation/gz/models:/opt/PX4-Autopilot/Tools/simulation/gz/worlds}
+      GAZEBO_WORLD_FILE: ${GAZEBO_WORLD_FILE:-/opt/PX4-Autopilot/Tools/simulation/gz/worlds/default.sdf}
     working_dir: /opt/iconom/sim
     volumes:
       - ./sim:/opt/iconom/sim:ro
@@ -82,7 +87,7 @@ services:
   ros_gz_bridge:
     build:
       context: .
-      dockerfile: docker/gazebo/Dockerfile
+      dockerfile: docker/ros_gz_bridge/Dockerfile
     environment:
       ROS_DISTRO: ${ROS_DISTRO:-humble}
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
