@@ -40,11 +40,12 @@ services:
       ROS_DISTRO: ${ROS_DISTRO:-humble}
       USE_SIM_TIME: ${USE_SIM_TIME:-true}
       GZ_SIM_RESOURCE_PATH: ${GZ_SIM_RESOURCE_PATH:-/opt/iconom/sim:/opt/PX4-Autopilot/Tools/simulation/gz/models:/opt/PX4-Autopilot/Tools/simulation/gz/worlds}
+      GZ_SIM_SERVER_CONFIG_PATH: ${GZ_SIM_SERVER_CONFIG_PATH:-/opt/iconom/sim/server.config}
       GAZEBO_WORLD_FILE: ${GAZEBO_WORLD_FILE:-/opt/PX4-Autopilot/Tools/simulation/gz/worlds/default.sdf}
     working_dir: /opt/iconom/sim
     volumes:
       - ./sim:/opt/iconom/sim:ro
-    command: ["bash", "-lc", "gz sim -s -r \"${GAZEBO_WORLD_FILE}\""]
+    command: ["bash", "-lc", "gz sim -s --headless-rendering -r \"${GAZEBO_WORLD_FILE}\""]
     restart: "no"
 
   xrce_agent:

@@ -8,8 +8,8 @@ COMPOSE_CMD=(docker compose)
 PX4_LOG="${ROOT_DIR}/.tmp-px4-camera.log"
 BRIDGE_LOG="${ROOT_DIR}/.tmp-ros-gz-bridge.log"
 PX4_PID=""
-BRIDGE_PID=""
 PX4_CONTAINER_NAME=""
+ROS2_APP_CONTAINER_NAME=""
 BRIDGE_CONTAINER_NAME="iconom-camera-bridge-test"
 
 require_cmd() {
@@ -27,10 +27,6 @@ require_file() {
 }
 
 cleanup() {
-  if [[ -n "${BRIDGE_PID}" ]] && kill -0 "${BRIDGE_PID}" >/dev/null 2>&1; then
-    kill "${BRIDGE_PID}" >/dev/null 2>&1 || true
-    wait "${BRIDGE_PID}" >/dev/null 2>&1 || true
-  fi
   if [[ -n "${PX4_PID}" ]] && kill -0 "${PX4_PID}" >/dev/null 2>&1; then
     kill "${PX4_PID}" >/dev/null 2>&1 || true
     wait "${PX4_PID}" >/dev/null 2>&1 || true
@@ -93,14 +89,14 @@ echo "step 1: validating compose config"
 echo "step 2: clearing any stale iconom containers"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" down --remove-orphans >/dev/null 2>&1 || true
 
-echo "step 3: building xrce_agent, ros2_app, ros_gz_bridge, and px4"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app ros_gz_bridge px4
+echo "step 3: building gazebo, xrce_agent, ros2_app, ros_gz_bridge, and px4"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build gazebo xrce_agent ros2_app ros_gz_bridge px4
 
-echo "step 4: starting xrce_agent and ros2_app"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d xrce_agent ros2_app
+echo "step 4: starting gazebo, xrce_agent, and ros2_app"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d gazebo xrce_agent ros2_app
 
 RUNNING_SERVICES="$("${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" ps --services --status running)"
-for service in xrce_agent ros2_app; do
+for service in gazebo xrce_agent ros2_app; do
   if ! grep -qx "${service}" <<<"${RUNNING_SERVICES}"; then
     echo "${service} did not reach running state before camera check" >&2
     "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs "${service}" || true
@@ -108,9 +104,17 @@ for service in xrce_agent ros2_app; do
   fi
 done
 
+ROS2_APP_CONTAINER_NAME="$(docker ps --filter 'label=com.docker.compose.service=ros2_app' --format '{{.Names}}' | head -n 1 || true)"
+if [[ -z "${ROS2_APP_CONTAINER_NAME}" ]]; then
+  echo "failed to identify the live ros2_app container" >&2
+  exit 74
+fi
+
 echo "step 5: launching the current PX4 runtime path in the background"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" run --rm --no-deps -T \
   -e PX4_HEADLESS="${PX4_HEADLESS:-1}" \
+  -e PX4_GZ_STANDALONE=1 \
+  -e PX4_GZ_HOSTNAME=gazebo \
   -e PX4_SYS_AUTOSTART="${PX4_SYS_AUTOSTART:-4003}" \
   -e PX4_GZ_WORLD="${PX4_GZ_WORLD:-default}" \
   -e PX4_SIM_MODEL="${PX4_SIM_MODEL:-gz_rc_cessna}" \
@@ -181,7 +185,7 @@ echo "discovered Gazebo camera info topic: ${GZ_CAMERA_INFO_TOPIC}"
 
 echo "step 8: starting ros_gz_bridge in the background"
 docker rm -f "${BRIDGE_CONTAINER_NAME}" >/dev/null 2>&1 || true
-docker run --rm --name "${BRIDGE_CONTAINER_NAME}" \
+docker run -d --name "${BRIDGE_CONTAINER_NAME}" \
   --network "container:${PX4_CONTAINER_NAME}" \
   -e ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}" \
   -e USE_SIM_TIME="${USE_SIM_TIME:-true}" \
@@ -200,21 +204,21 @@ docker run --rm --name "${BRIDGE_CONTAINER_NAME}" \
       --ros-args \
       -r "${GZ_IMAGE_TOPIC}:=${CAMERA_TOPIC}" \
       -r "${GZ_CAMERA_INFO_TOPIC}:=${CAMERA_INFO_TOPIC}"
-  ' </dev/null >"${BRIDGE_LOG}" 2>&1 &
-BRIDGE_PID=$!
+  ' >/dev/null
 
 echo "step 9: polling ROS 2 graph for camera topics"
 for ((i=1; i<=DISCOVERY_WAIT_SEC; i++)); do
-  if [[ -n "${BRIDGE_PID}" ]] && ! kill -0 "${BRIDGE_PID}" >/dev/null 2>&1; then
-    BRIDGE_EXIT=0
-    wait "${BRIDGE_PID}" || BRIDGE_EXIT=$?
+  BRIDGE_STATUS="$(docker inspect --format '{{.State.Status}}' "${BRIDGE_CONTAINER_NAME}" 2>/dev/null || true)"
+  if [[ -n "${BRIDGE_STATUS}" && "${BRIDGE_STATUS}" != "running" ]]; then
+    BRIDGE_EXIT="$(docker inspect --format '{{.State.ExitCode}}' "${BRIDGE_CONTAINER_NAME}" 2>/dev/null || echo 1)"
+    docker logs --tail=200 "${BRIDGE_CONTAINER_NAME}" >"${BRIDGE_LOG}" 2>&1 || true
     echo "ros_gz_bridge exited before camera topics became visible" >&2
     echo "ros_gz_bridge exit code: ${BRIDGE_EXIT}" >&2
     cat "${BRIDGE_LOG}" >&2 || true
     exit 77
   fi
 
-  TOPICS="$("${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" exec -T ros2_app bash -lc 'set +u; source /opt/ros/humble/setup.bash >/dev/null 2>&1; if [[ -f /workspaces/ros2_ws/install/setup.bash ]]; then source /workspaces/ros2_ws/install/setup.bash >/dev/null 2>&1; fi; set -u; ros2 topic list 2>/dev/null || true')"
+  TOPICS="$(docker exec "${ROS2_APP_CONTAINER_NAME}" bash -lc 'set +u; source /opt/ros/humble/setup.bash >/dev/null 2>&1; if [[ -f /workspaces/ros2_ws/install/setup.bash ]]; then source /workspaces/ros2_ws/install/setup.bash >/dev/null 2>&1; fi; set -u; ros2 topic list 2>/dev/null || true')"
 
   if grep -qx "${CAMERA_TOPIC}" <<<"${TOPICS}" && grep -qx "${CAMERA_INFO_TOPIC}" <<<"${TOPICS}"; then
     break
@@ -223,16 +227,18 @@ for ((i=1; i<=DISCOVERY_WAIT_SEC; i++)); do
   sleep 1
 done
 
-if ! "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" exec -T ros2_app bash -lc "set +u; source /opt/ros/humble/setup.bash >/dev/null 2>&1; set -u; ros2 topic list 2>/dev/null | grep -qx '${CAMERA_TOPIC}'"; then
+if ! docker exec "${ROS2_APP_CONTAINER_NAME}" bash -lc "set +u; source /opt/ros/humble/setup.bash >/dev/null 2>&1; set -u; ros2 topic list 2>/dev/null | grep -qx '${CAMERA_TOPIC}'"; then
   echo "camera image topic did not appear in ROS 2: ${CAMERA_TOPIC}" >&2
   echo "--- ros_gz_bridge log ---" >&2
+  docker logs --tail=200 "${BRIDGE_CONTAINER_NAME}" >"${BRIDGE_LOG}" 2>&1 || true
   cat "${BRIDGE_LOG}" >&2 || true
   exit 78
 fi
 
-if ! "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" exec -T ros2_app bash -lc "set +u; source /opt/ros/humble/setup.bash >/dev/null 2>&1; set -u; timeout 15 ros2 topic echo --once '${CAMERA_INFO_TOPIC}' >/dev/null"; then
+if ! docker exec "${ROS2_APP_CONTAINER_NAME}" bash -lc "set +u; source /opt/ros/humble/setup.bash >/dev/null 2>&1; set -u; timeout 15 ros2 topic echo --once '${CAMERA_INFO_TOPIC}' >/dev/null"; then
   echo "camera info messages did not flow through ROS 2: ${CAMERA_INFO_TOPIC}" >&2
   echo "--- ros_gz_bridge log ---" >&2
+  docker logs --tail=200 "${BRIDGE_CONTAINER_NAME}" >"${BRIDGE_LOG}" 2>&1 || true
   cat "${BRIDGE_LOG}" >&2 || true
   exit 79
 fi

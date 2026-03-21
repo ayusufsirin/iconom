@@ -5,6 +5,7 @@ import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 
 
@@ -21,7 +22,7 @@ class ImageSubscriber(Node):
             Image,
             self.topic,
             self._handle_image,
-            10,
+            qos_profile_sensor_data,
         )
         self.timer = self.create_timer(0.5, self._check_timeout)
 

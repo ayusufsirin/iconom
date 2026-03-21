@@ -119,14 +119,14 @@ echo "step 1: validating compose config"
 echo "step 2: clearing any stale iconom containers"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" down --remove-orphans >/dev/null 2>&1 || true
 
-echo "step 3: building xrce_agent, ros2_app, and px4"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app px4
+echo "step 3: building gazebo, xrce_agent, ros2_app, and px4"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build gazebo xrce_agent ros2_app px4
 
-echo "step 4: starting xrce_agent and ros2_app"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d xrce_agent ros2_app
+echo "step 4: starting gazebo, xrce_agent, and ros2_app"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d gazebo xrce_agent ros2_app
 
 RUNNING_SERVICES="$("${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" ps --services --status running)"
-for service in xrce_agent ros2_app; do
+for service in gazebo xrce_agent ros2_app; do
   if ! grep -qx "${service}" <<<"${RUNNING_SERVICES}"; then
     echo "${service} did not reach running state before offboard movement check" >&2
     "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs "${service}" || true
@@ -151,6 +151,8 @@ echo "step 5: building PX4 message and control packages"
 echo "step 6: launching the current PX4 runtime path in the background"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" run --rm --no-deps -T \
   -e PX4_HEADLESS="${PX4_HEADLESS:-1}" \
+  -e PX4_GZ_STANDALONE=1 \
+  -e PX4_GZ_HOSTNAME=gazebo \
   -e PX4_SYS_AUTOSTART="${PX4_SYS_AUTOSTART:-4003}" \
   -e PX4_GZ_WORLD="${PX4_GZ_WORLD:-default}" \
   -e PX4_SIM_MODEL="${PX4_SIM_MODEL:-gz_rc_cessna}" \

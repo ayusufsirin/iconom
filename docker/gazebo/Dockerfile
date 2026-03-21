@@ -14,10 +14,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(. /etc/os-release && echo ${UBUNTU_CODENAME}) main" \
     > /etc/apt/sources.list.d/gazebo-stable.list \
  && apt-get update && apt-get install -y --no-install-recommends \
+    gz-harmonic \
     gz-launch7-cli \
     gz-sim8-cli \
     gz-tools2 \
     libgz-physics7-dartsim \
+    libgz-rendering8-ogre2 \
     libgz-sim8 \
     libgz-sim8-plugins \
  && rm -rf /var/lib/apt/lists/*
@@ -31,6 +33,20 @@ WORKDIR /opt/iconom/sim
 
 RUN git clone --branch "${PX4_GIT_REF}" --depth 1 https://github.com/PX4/PX4-Autopilot.git /opt/PX4-Autopilot \
  && git -C /opt/PX4-Autopilot submodule update --init --depth 1 Tools/simulation/gz
+
+RUN python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/opt/PX4-Autopilot/Tools/simulation/gz/models/rc_cessna/model.sdf")
+anchor = "    <link name=\"airspeed\">"
+insert = """    <include merge='true'>\n      <uri>model://mono_cam</uri>\n      <pose>0.24 0 0.02 0 0 0</pose>\n    </include>\n    <joint name=\"camera_joint\" type=\"fixed\">\n      <parent>base_link</parent>\n      <child>camera_link</child>\n      <pose relative_to=\"base_link\">0.24 0 0.02 0 0 0</pose>\n    </joint>\n    <link name=\"airspeed\">"""
+text = path.read_text()
+
+if anchor not in text:
+    raise SystemExit(f"expected rc_cessna insertion point not found in {path}")
+
+path.write_text(text.replace(anchor, insert, 1))
+PY
 
 COPY sim/ /opt/iconom/sim/
 COPY docker/gazebo/entrypoint.sh /usr/local/bin/gazebo-entrypoint.sh
