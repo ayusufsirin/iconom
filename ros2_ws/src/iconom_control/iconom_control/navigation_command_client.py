@@ -163,7 +163,7 @@ class NavigationCommandClient(Node):
                 VehicleCommand.VEHICLE_CMD_DO_REPOSITION,
                 {
                     "param1": self.groundspeed_m_s,
-                    "param2": 0.0,
+                    "param2": 1.0,
                     "param3": self.loiter_radius_m,
                     "param4": yaw,
                     "param5": target_lat,

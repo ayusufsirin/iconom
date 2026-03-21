@@ -24,6 +24,7 @@ setup(
             "offboard_hold_publisher = iconom_control.offboard_hold_publisher:main",
             "offboard_rate_thrust_publisher = iconom_control.offboard_rate_thrust_publisher:main",
             "vehicle_local_position_waiter = iconom_control.vehicle_local_position_waiter:main",
+            "vehicle_global_position_target_waiter = iconom_control.vehicle_global_position_target_waiter:main",
         ],
     },
 )

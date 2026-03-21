@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CHECK_SCRIPT="${ROOT_DIR}/scripts/check-nav-loiter.sh"
+CHECK_SCRIPT="${ROOT_DIR}/scripts/check-nav-reposition.sh"
 
 MODE="${ICONOM_PHASE3_MODE:-headless}"
 
