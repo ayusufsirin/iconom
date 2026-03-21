@@ -6,11 +6,9 @@ COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
 ENV_FILE="${ROOT_DIR}/.env.example"
 COMPOSE_CMD=(docker compose)
 PX4_LOG="${ROOT_DIR}/.tmp-px4-camera.log"
-BRIDGE_LOG="${ROOT_DIR}/.tmp-ros-gz-bridge.log"
 PX4_PID=""
 PX4_CONTAINER_NAME=""
 ROS2_APP_CONTAINER_NAME=""
-BRIDGE_CONTAINER_NAME="iconom-camera-bridge-test"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -31,8 +29,7 @@ cleanup() {
     kill "${PX4_PID}" >/dev/null 2>&1 || true
     wait "${PX4_PID}" >/dev/null 2>&1 || true
   fi
-  docker rm -f "${BRIDGE_CONTAINER_NAME}" >/dev/null 2>&1 || true
-  rm -f "${PX4_LOG}" "${BRIDGE_LOG}"
+  rm -f "${PX4_LOG}"
   "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" down --remove-orphans >/dev/null 2>&1 || true
 }
 
@@ -92,11 +89,11 @@ echo "step 2: clearing any stale iconom containers"
 echo "step 3: building gazebo, xrce_agent, ros2_app, ros_gz_bridge, and px4"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build gazebo xrce_agent ros2_app ros_gz_bridge px4
 
-echo "step 4: starting gazebo, xrce_agent, and ros2_app"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d gazebo xrce_agent ros2_app
+echo "step 4: starting gazebo, xrce_agent, ros2_app, and ros_gz_bridge"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d gazebo xrce_agent ros2_app ros_gz_bridge
 
 RUNNING_SERVICES="$("${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" ps --services --status running)"
-for service in gazebo xrce_agent ros2_app; do
+for service in gazebo xrce_agent ros2_app ros_gz_bridge; do
   if ! grep -qx "${service}" <<<"${RUNNING_SERVICES}"; then
     echo "${service} did not reach running state before camera check" >&2
     "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs "${service}" || true
@@ -183,38 +180,13 @@ fi
 echo "discovered Gazebo image topic: ${GZ_IMAGE_TOPIC}"
 echo "discovered Gazebo camera info topic: ${GZ_CAMERA_INFO_TOPIC}"
 
-echo "step 8: starting ros_gz_bridge in the background"
-docker rm -f "${BRIDGE_CONTAINER_NAME}" >/dev/null 2>&1 || true
-docker run -d --name "${BRIDGE_CONTAINER_NAME}" \
-  --network "container:${PX4_CONTAINER_NAME}" \
-  -e ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}" \
-  -e USE_SIM_TIME="${USE_SIM_TIME:-true}" \
-  -e GZ_IMAGE_TOPIC="${GZ_IMAGE_TOPIC}" \
-  -e GZ_CAMERA_INFO_TOPIC="${GZ_CAMERA_INFO_TOPIC}" \
-  -e CAMERA_TOPIC="${CAMERA_TOPIC}" \
-  -e CAMERA_INFO_TOPIC="${CAMERA_INFO_TOPIC}" \
-  iconom-ros_gz_bridge bash -lc '
-    set -euo pipefail
-    set +u
-    source /opt/ros/humble/setup.bash
-    set -u
-    exec ros2 run ros_gz_bridge parameter_bridge \
-      "${GZ_IMAGE_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image" \
-      "${GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo" \
-      --ros-args \
-      -r "${GZ_IMAGE_TOPIC}:=${CAMERA_TOPIC}" \
-      -r "${GZ_CAMERA_INFO_TOPIC}:=${CAMERA_INFO_TOPIC}"
-  ' >/dev/null
-
-echo "step 9: polling ROS 2 graph for camera topics"
+echo "step 8: polling ROS 2 graph for camera topics through ros_gz_bridge service"
 for ((i=1; i<=DISCOVERY_WAIT_SEC; i++)); do
-  BRIDGE_STATUS="$(docker inspect --format '{{.State.Status}}' "${BRIDGE_CONTAINER_NAME}" 2>/dev/null || true)"
-  if [[ -n "${BRIDGE_STATUS}" && "${BRIDGE_STATUS}" != "running" ]]; then
-    BRIDGE_EXIT="$(docker inspect --format '{{.State.ExitCode}}' "${BRIDGE_CONTAINER_NAME}" 2>/dev/null || echo 1)"
-    docker logs --tail=200 "${BRIDGE_CONTAINER_NAME}" >"${BRIDGE_LOG}" 2>&1 || true
-    echo "ros_gz_bridge exited before camera topics became visible" >&2
-    echo "ros_gz_bridge exit code: ${BRIDGE_EXIT}" >&2
-    cat "${BRIDGE_LOG}" >&2 || true
+  BRIDGE_RUNNING="$("${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" ps --services --status running | grep -x 'ros_gz_bridge' || true)"
+  if [[ -z "${BRIDGE_RUNNING}" ]]; then
+    echo "ros_gz_bridge service exited before camera topics became visible" >&2
+    echo "--- ros_gz_bridge log ---" >&2
+    "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs --tail=200 ros_gz_bridge >&2 || true
     exit 77
   fi
 
@@ -230,16 +202,14 @@ done
 if ! docker exec "${ROS2_APP_CONTAINER_NAME}" bash -lc "set +u; source /opt/ros/humble/setup.bash >/dev/null 2>&1; set -u; ros2 topic list 2>/dev/null | grep -qx '${CAMERA_TOPIC}'"; then
   echo "camera image topic did not appear in ROS 2: ${CAMERA_TOPIC}" >&2
   echo "--- ros_gz_bridge log ---" >&2
-  docker logs --tail=200 "${BRIDGE_CONTAINER_NAME}" >"${BRIDGE_LOG}" 2>&1 || true
-  cat "${BRIDGE_LOG}" >&2 || true
+  "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs --tail=200 ros_gz_bridge >&2 || true
   exit 78
 fi
 
 if ! docker exec "${ROS2_APP_CONTAINER_NAME}" bash -lc "set +u; source /opt/ros/humble/setup.bash >/dev/null 2>&1; set -u; timeout 15 ros2 topic echo --once '${CAMERA_INFO_TOPIC}' >/dev/null"; then
   echo "camera info messages did not flow through ROS 2: ${CAMERA_INFO_TOPIC}" >&2
   echo "--- ros_gz_bridge log ---" >&2
-  docker logs --tail=200 "${BRIDGE_CONTAINER_NAME}" >"${BRIDGE_LOG}" 2>&1 || true
-  cat "${BRIDGE_LOG}" >&2 || true
+  "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs --tail=200 ros_gz_bridge >&2 || true
   exit 79
 fi
 

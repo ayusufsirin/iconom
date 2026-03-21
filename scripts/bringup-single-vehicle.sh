@@ -65,20 +65,20 @@ echo "px4 model: ${PX4_SIM_MODEL}"
 echo "px4 world: ${PX4_GZ_WORLD:-default}"
 echo
 echo "this is the maintained single-vehicle runtime path."
-echo "it starts gazebo as the simulator owner, keeps xrce_agent and ros2_app as companion services,"
+echo "it starts gazebo as the simulator owner, keeps xrce_agent, ros2_app, and ros_gz_bridge as companion services,"
 echo "and launches PX4 in standalone Gazebo-attachment mode."
 echo
 echo "step 1: validating compose config"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" config >/dev/null
 
 echo "step 2: building required services"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app gazebo px4
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app gazebo ros_gz_bridge px4
 
-echo "step 3: starting gazebo, xrce_agent, and ros2_app"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d gazebo xrce_agent ros2_app
+echo "step 3: starting gazebo, xrce_agent, ros2_app, and ros_gz_bridge"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d gazebo xrce_agent ros2_app ros_gz_bridge
 
 RUNNING_SERVICES="$("${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" ps --services --status running)"
-for service in gazebo xrce_agent ros2_app; do
+for service in gazebo xrce_agent ros2_app ros_gz_bridge; do
   if ! grep -qx "${service}" <<<"${RUNNING_SERVICES}"; then
     echo "${service} did not reach running state before bring-up" >&2
     "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs "${service}" || true

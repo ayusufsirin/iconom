@@ -30,7 +30,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 
 ## Current Slice
 
-All four service slices now exist: `xrce_agent`, `ros2_app`, `px4`, and `gazebo`. The current integrated milestone is no longer basic service availability. The repo now has a truthful one-vehicle runtime, PX4 telemetry discovery, and a first Gazebo camera bridge into ROS 2.
+All five maintained service slices now exist: `xrce_agent`, `ros2_app`, `px4`, `gazebo`, and `ros_gz_bridge`. The current integrated milestone is no longer basic service availability. The repo now has a truthful one-vehicle runtime, PX4 telemetry discovery, and a maintained Gazebo camera bridge into ROS 2.
 
 This repo requires Docker Compose v2 via `docker compose`.
 
@@ -51,7 +51,7 @@ For this telemetry step, the ROS workspace now carries a pinned [px4_msgs.repos]
 The current camera milestone is [check-camera-bridge.sh](./scripts/check-camera-bridge.sh). It validates one forward camera on the `gz_rc_cessna` runtime and proves that:
 
 - Gazebo publishes the live camera image and camera-info topics,
-- a `ros_gz_bridge` one-off container can join the live PX4 runtime network namespace,
+- the maintained `ros_gz_bridge` service stays alive alongside the separated runtime,
 - ROS 2 sees `/plane_01/camera/image_raw` and `/plane_01/camera/camera_info`.
 
 The next ROS-side proof is [check-camera-subscriber.sh](./scripts/check-camera-subscriber.sh). It builds the minimal `iconom_vision` package in `ros2_ws`, launches a subscriber in `ros2_app`, and verifies that one bridged image frame is actually received.

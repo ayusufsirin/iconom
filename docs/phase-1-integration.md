@@ -12,7 +12,7 @@ This document defines the first honest single-vehicle integration baseline.
 
 ## What Is Wired
 
-- The four containers can be built and started together under one `plane_01` contract.
+- The maintained service set can be built and started together under one `plane_01` contract.
 - `px4` and `ros2_app` depend on `xrce_agent` in the canonical compose stack.
 - `scripts/integration-single-vehicle.sh` validates the agreed namespace, model, world, and workspace assumptions inside the running containers.
 - `scripts/bringup-single-vehicle.sh` is the first actual runtime attempt for one PX4-backed aircraft in Gazebo.
@@ -20,7 +20,7 @@ This document defines the first honest single-vehicle integration baseline.
 - `scripts/phase1-launch.sh` is the canonical operator entrypoint for the maintained phase-1 runtime in headless or GUI mode.
 - `scripts/check-px4-telemetry.sh` is the first narrow telemetry discovery check for `/plane_01/fmu/out/...` during the current runtime path.
 - `ros2_ws/src/px4_msgs.repos` pins the minimum ROS-side PX4 message dependency for telemetry type visibility.
-- `scripts/check-camera-bridge.sh` validates the first camera slice by discovering Gazebo camera topics in the live PX4 runtime container and bridging them into ROS 2.
+- `scripts/check-camera-bridge.sh` validates the first camera slice by discovering Gazebo camera topics in the live PX4 runtime container and verifying that the maintained `ros_gz_bridge` service bridges them into ROS 2.
 - `ros2_ws/src/iconom_vision` contains the first repo-owned ROS 2 vision package for the camera slice.
 - `scripts/check-camera-subscriber.sh` validates that a ROS-side subscriber can receive at least one bridged image frame on `/plane_01/camera/image_raw`.
 - `ros2_ws/src/iconom_control` contains the first repo-owned ROS 2 control package for the command slice.
@@ -37,7 +37,7 @@ This document defines the first honest single-vehicle integration baseline.
 - The current `gz_rc_cessna` phase-1 baseline explicitly overrides two PX4 airframe defaults to make headless SITL arming achievable:
   - `NAV_DLL_ACT=0`
   - `SYS_HAS_NUM_ASPD=0`
-- The current camera bridge process runs in a one-off `ros_gz_bridge` container that shares the live PX4 runtime network namespace.
+- The maintained runtime now includes a long-running `ros_gz_bridge` service for the camera bridge path.
 
 ## What Is Not Yet Wired
 

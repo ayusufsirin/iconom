@@ -73,20 +73,20 @@ echo "px4 world: ${PX4_GZ_WORLD:-default}"
 echo "display: ${DISPLAY}"
 echo
 echo "this is the integrated aircraft GUI path."
-echo "it uses the local override stack for X11, starts the standalone gazebo service,"
+echo "it uses the local override stack for X11, starts the standalone gazebo service plus ros_gz_bridge,"
 echo "and forces PX4_HEADLESS=0 while PX4 attaches to that external runtime."
 echo
 echo "step 1: validating merged compose config"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" config >/dev/null
 
 echo "step 2: building required services"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app gazebo px4
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build xrce_agent ros2_app gazebo ros_gz_bridge px4
 
-echo "step 3: starting gazebo, xrce_agent, and ros2_app"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d gazebo xrce_agent ros2_app
+echo "step 3: starting gazebo, xrce_agent, ros2_app, and ros_gz_bridge"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d gazebo xrce_agent ros2_app ros_gz_bridge
 
 RUNNING_SERVICES="$("${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" ps --services --status running)"
-for service in gazebo xrce_agent ros2_app; do
+for service in gazebo xrce_agent ros2_app ros_gz_bridge; do
   if ! grep -qx "${service}" <<<"${RUNNING_SERVICES}"; then
     echo "${service} did not reach running state before GUI bring-up" >&2
     "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs "${service}" || true
