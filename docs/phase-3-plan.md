@@ -68,20 +68,16 @@ The following constraints stay fixed unless deliberately revised:
 
 ## First Guidance Primitive
 
-Phase 3 should start with one of these, in order of preference:
+The first proven phase-3 primitive is PX4-native `NAV_TAKEOFF`.
 
-1. waypoint-style local guidance
-2. loiter-target guidance
-3. heading/altitude target guidance
+Why this became the correct first step:
 
-The recommended first primitive is waypoint-style local guidance, but only in a narrow form:
+- it uses PX4 navigation semantics instead of raw movement control,
+- it is bounded and telemetry-verifiable,
+- it gets the aircraft into a meaningful guided flight state,
+- it is a safer first proof than jumping directly into freer waypoint behavior from rest.
 
-- one target point,
-- one aircraft,
-- one guidance script,
-- one success metric.
-
-This gives the project a real autonomy milestone without immediately committing to full mission semantics.
+This does not replace later waypoint or loiter guidance. It establishes the first honest higher-level primitive above the phase-2 offboard movement layer.
 
 ## Recommended Technical Direction
 
@@ -96,7 +92,7 @@ Reason:
 
 - phase 2 already proved that raw `OFFBOARD` transport and bounded movement work,
 - fixed-wing guidance should now move up one abstraction level,
-- waypoint-style behavior is more naturally aligned with PX4 navigation semantics than with ad hoc `body_rate + thrust` control,
+- PX4-native navigation commands are more naturally aligned with fixed-wing guidance than ad hoc `body_rate + thrust` control,
 - this keeps the first autonomy slice closer to aircraft guidance and farther from manual low-level actuation.
 
 The first phase-3 slice should therefore build on mode/navigation semantics first, and only fall back to deeper `OFFBOARD` control if PX4-native guidance proves insufficient for the bounded target behavior.
@@ -109,15 +105,15 @@ The first fixed-wing guidance primitive will use this contract:
 2. publish or configure one bounded target behavior at the guidance layer,
 3. validate success through PX4 telemetry rather than through command ack alone.
 
-The first target behavior should be:
+The first target behavior is now:
 
-- one bounded loiter-target or waypoint-style guidance behavior for `plane_01`
+- one bounded `NAV_TAKEOFF` behavior for `plane_01`
 
 The success signal should be telemetry-based, for example:
 
-- stable `VehicleStatus.nav_state`,
-- meaningful `VehicleLocalPosition` response over time,
-- and a bounded success condition such as remaining near a target region or converging toward a single target point.
+- `VehicleCommandAck` accepted for the PX4-native navigation command,
+- `VehicleStatus.nav_state=AUTO_TAKEOFF`,
+- meaningful `VehicleLocalPosition` climb and movement after the command.
 
 ## Implementation Order
 
@@ -141,6 +137,12 @@ Success:
 - one bounded target behavior is encoded,
 - the node is runnable from the maintained stack.
 
+Current result:
+
+- `iconom_control.navigation_command_client` exists,
+- it supports `nav_takeoff` as the first maintained PX4-native guidance command,
+- it seeds its target from live `VehicleGlobalPosition` telemetry.
+
 ### Slice 3: Telemetry Proof
 
 Validate the behavior through PX4 telemetry.
@@ -150,6 +152,13 @@ Success:
 - success is defined in terms of `VehicleStatus`, `VehicleLocalPosition`, or another pinned PX4 topic,
 - the behavior can be distinguished from raw movement.
 
+Current result:
+
+- [check-nav-takeoff.sh](../scripts/check-nav-takeoff.sh) proves headless `NAV_TAKEOFF`,
+- PX4 accepts the command,
+- `VehicleStatus` enters `AUTO_TAKEOFF`,
+- `VehicleLocalPosition` shows real takeoff motion.
+
 ### Slice 4: Acceptance and GUI Confirmation
 
 Add the maintained validation path for the primitive.
@@ -158,6 +167,12 @@ Success:
 
 - one headless acceptance script passes,
 - the same behavior can be observed in the GUI path.
+
+Current result:
+
+- [phase3-acceptance.sh](../scripts/phase3-acceptance.sh) exists as the maintained phase-3 validation entrypoint,
+- [check-nav-takeoff.sh](../scripts/check-nav-takeoff.sh) passes headless,
+- [check-nav-takeoff.sh](../scripts/check-nav-takeoff.sh) also passes in GUI mode.
 
 ## Acceptance Criteria
 
@@ -170,11 +185,15 @@ Phase 3 is complete when all of the following are true:
 - the primitive can be observed in the GUI runtime,
 - the work does not introduce multi-vehicle assumptions.
 
+The current slice satisfies these criteria for the first bounded `NAV_TAKEOFF` primitive.
+
 ## Risks
 
 - fixed-wing PX4 guidance semantics may not align cleanly with the current offboard-control pattern,
 - some behaviors that look simple for multicopters may be poor first targets for fixed-wing SITL,
 - telemetry may prove command transport but not true path-following quality unless the success metric is chosen carefully.
+
+- `NAV_TAKEOFF` is a meaningful first guidance step, but it is still only the start of fixed-wing autonomy and not yet waypoint convergence or route following.
 
 These are why phase 3 should stay narrow and prove one guidance primitive well before expanding scope.
 
@@ -186,6 +205,8 @@ Phase-3 completion should leave the repo with:
 - one validation script for the new primitive
 - updated documentation
 - one clear success metric for the behavior
+
+The next likely phase-3 increment after this first primitive is airborne loiter or waypoint behavior after takeoff, not a return to raw offboard movement as the main abstraction.
 
 ## Initial Next Step
 

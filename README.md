@@ -20,6 +20,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Single-Vehicle GUI Bring-Up Script](./scripts/bringup-single-vehicle-gui.sh)
 - [Phase 1 Launch Script](./scripts/phase1-launch.sh)
 - [Phase 1 Acceptance Script](./scripts/phase1-acceptance.sh)
+- [Phase 3 Acceptance Script](./scripts/phase3-acceptance.sh)
 - [PX4 Telemetry Check Script](./scripts/check-px4-telemetry.sh)
 - [Camera Bridge Check Script](./scripts/check-camera-bridge.sh)
 - [Camera Subscriber Check Script](./scripts/check-camera-subscriber.sh)
@@ -79,6 +80,8 @@ This movement result matters because fixed-wing position-style offboard from res
 
 The first phase-3 guidance proof is [check-nav-takeoff.sh](./scripts/check-nav-takeoff.sh). It uses a PX4-native navigation command instead of raw offboard motion, seeds a bounded target from live `/plane_01/fmu/out/vehicle_global_position`, sends `NAV_TAKEOFF`, and requires both `VehicleStatus.nav_state=AUTO_TAKEOFF` and real takeoff motion in `VehicleLocalPosition`.
 
+The canonical validation entrypoint for the current phase-3 slice is [phase3-acceptance.sh](./scripts/phase3-acceptance.sh). It runs the maintained `NAV_TAKEOFF` guidance proof in either headless or GUI mode.
+
 ## Local Gazebo GUI
 
 The canonical stack remains headless in [docker-compose.yml](./docker-compose.yml). Local host GUI behavior is added only through [docker-compose.override.yml](./docker-compose.override.yml).
@@ -122,6 +125,21 @@ GUI acceptance:
 ```bash
 xhost +local:docker
 ./scripts/phase1-acceptance.sh --gui
+```
+
+## Phase 3 Daily Use
+
+Headless guidance acceptance:
+
+```bash
+./scripts/phase3-acceptance.sh --headless
+```
+
+GUI guidance acceptance:
+
+```bash
+xhost +local:docker
+./scripts/phase3-acceptance.sh --gui
 ```
 
 ## Phase 0 Goal
