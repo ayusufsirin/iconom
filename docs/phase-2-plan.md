@@ -2,7 +2,7 @@
 
 This document defines the next bounded phase after the tagged `phase1-baseline`.
 
-Phase 2 does not expand into swarm behavior or mission autonomy yet. Its job is to replace the transitional phase-1 runtime shape with a cleaner, separable simulator architecture while keeping the phase-1 single-vehicle contract intact.
+Phase 2 did not expand into swarm behavior or mission autonomy. Its job was to replace the transitional phase-1 runtime shape with a cleaner, separable simulator architecture while keeping the phase-1 single-vehicle contract intact.
 
 ## Purpose
 
@@ -15,17 +15,17 @@ Phase 1 proved that the single-vehicle stack works:
 - ROS commands reach PX4,
 - offboard entry and first movement are validated.
 
-But the current runtime still has one major architectural compromise:
+At the start of phase 2, the runtime still had one major architectural compromise:
 
 - PX4 launches Gazebo from inside the `px4` container.
 
-Phase 2 exists to remove that compromise.
+Phase 2 existed to remove that compromise.
 
 ## Phase 2 Goal
 
 Promote the standalone `gazebo` service from a local utility into the real simulator backend for the maintained single-vehicle stack.
 
-Success means:
+Completed result:
 
 1. `gazebo` becomes the actual simulator process for the maintained one-vehicle runtime,
 2. `px4` connects to that external Gazebo runtime rather than spawning its own,
@@ -75,54 +75,33 @@ Phase 1 uses a transitional runtime:
 - `px4` starts Gazebo internally,
 - `ros_gz_bridge` joins that live PX4 runtime network namespace to see Gazebo topics.
 
-Phase 2 should move toward this target:
+Phase 2 target:
 
 - `gazebo` owns the simulator runtime,
 - `px4` joins an already-running Gazebo world in standalone mode,
 - `ros_gz_bridge` can connect through the maintained Compose network without container-namespace tricks.
 
-That change is the core of phase 2.
+That change was the core of phase 2 and is now the maintained runtime shape.
 
-## Implementation Order
-
-The work should stay narrow and sequential.
+## Implemented Slices
 
 ### Slice 1: External Gazebo Ownership
-
-Make `gazebo` the actual runtime process for the maintained single-vehicle stack.
-
-Success:
-
-- one maintained launch path starts `gazebo` first,
-- PX4 does not spawn Gazebo internally in that path,
-- the world is externally visible and stable.
+- `gazebo` is the maintained runtime owner for the single-vehicle stack.
+- one maintained launch path starts `gazebo` first.
+- PX4 no longer spawns Gazebo internally in the maintained path.
 
 ### Slice 2: PX4 External-Gazebo Attachment
-
-Update `px4` to join the external Gazebo runtime cleanly.
-
-Success:
-
-- PX4 discovers the external world,
-- the `gz_rc_cessna` model is spawned or attached deterministically,
-- the current single-vehicle bring-up still reaches `pxh>`.
+- PX4 joins the external Gazebo runtime cleanly.
+- the `gz_rc_cessna` model attaches deterministically.
+- the maintained single-vehicle bring-up reaches `pxh>`.
 
 ### Slice 3: Camera and Bridge Reconciliation
-
-Replace the current bridge workaround with a normal Compose-network path.
-
-Success:
-
-- Gazebo camera topics are discovered without joining the PX4 container namespace,
-- ROS 2 still receives `/plane_01/camera/image_raw`,
+- Gazebo camera topics are discovered under the separated runtime.
+- a maintained long-running `ros_gz_bridge` service now owns the camera bridge path.
+- ROS 2 still receives `/plane_01/camera/image_raw`.
 - the camera subscriber still receives frames.
 
 ### Slice 4: Control Regression Pass
-
-Re-run the existing control proofs against the separated runtime.
-
-Success:
-
 - telemetry check passes,
 - command check passes,
 - mode check passes,
@@ -130,25 +109,20 @@ Success:
 - offboard movement passes.
 
 ### Slice 5: Entry Point Cleanup
-
-Update the maintained operator and acceptance scripts to reflect the separated runtime as the new default.
-
-Success:
-
-- `scripts/phase1-launch.sh` still works, or is replaced by a clearer canonical runtime script,
-- `scripts/phase1-acceptance.sh` still works against the separated runtime,
+- `scripts/phase1-launch.sh` works against the separated runtime.
+- `scripts/phase1-acceptance.sh` passes against the separated runtime.
 - GUI and headless modes remain explicit and honest.
 
 ## Acceptance Criteria
 
-Phase 2 is complete when all of the following are true:
+Phase 2 is complete and the following are now true:
 
 - one canonical headless operator path uses external Gazebo service ownership,
 - one canonical GUI operator path uses external Gazebo service ownership,
 - the current single-vehicle validation set still passes,
 - the camera consumer still receives frames,
 - PX4 no longer needs to launch Gazebo from inside the `px4` container in the maintained path,
-- the transitional phase-1 runtime is either removed or clearly marked legacy.
+- the transitional phase-1 runtime is demoted and no longer described as the maintained path.
 
 ## Risks
 
@@ -169,8 +143,9 @@ Phase-2 completion should leave the repo with:
 - updated documentation for the maintained single-vehicle flow
 - removal or demotion of the old PX4-internal Gazebo path
 
-## Initial Next Step
+## Next Step
 
-The first concrete phase-2 task should be:
+The next bounded step after phase 2 should be one of:
 
-- design and implement the first external-Gazebo single-vehicle bring-up path while preserving the `plane_01` contract.
+- multi-vehicle planning and naming/port/runtime design, or
+- higher-level autonomy work on top of the now-stable single-vehicle separated runtime.

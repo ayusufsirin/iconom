@@ -36,9 +36,9 @@ This repo requires Docker Compose v2 via `docker compose`.
 
 The first integrated baseline is now `plane_01` via [integration-single-vehicle.sh](./scripts/integration-single-vehicle.sh). It validates the shared one-vehicle launch contract without claiming full PX4-in-Gazebo vehicle runtime yet.
 
-The first actual one-vehicle runtime attempt is [bringup-single-vehicle.sh](./scripts/bringup-single-vehicle.sh). It launches PX4's native `gz_rc_cessna` Gazebo path inside the `px4` container while `xrce_agent` and `ros2_app` run as companion services.
+The maintained one-vehicle runtime is [bringup-single-vehicle.sh](./scripts/bringup-single-vehicle.sh). It starts the standalone `gazebo` service first, keeps `xrce_agent`, `ros2_app`, and `ros_gz_bridge` as companion services, and launches PX4 in external Gazebo-attachment mode.
 
-The local integrated aircraft GUI path is [bringup-single-vehicle-gui.sh](./scripts/bringup-single-vehicle-gui.sh). It uses the local override stack to route X11 into the `px4` runtime and forces `PX4_HEADLESS=0`.
+The local integrated aircraft GUI path is [bringup-single-vehicle-gui.sh](./scripts/bringup-single-vehicle-gui.sh). It uses the local override stack to route X11 into the separated runtime and forces `PX4_HEADLESS=0`.
 
 The canonical operator entrypoint is now [phase1-launch.sh](./scripts/phase1-launch.sh). It selects the maintained phase-1 runtime path in either headless or GUI mode without changing the underlying one-vehicle contract.
 
@@ -126,6 +126,6 @@ Freeze the minimum set of architectural decisions required to let future coding 
 
 ## Phase 2 Direction
 
-Phase 2 starts from the tagged `phase1-baseline` and keeps the same single-vehicle contract while removing the largest remaining architectural compromise: Gazebo should become a first-class standalone runtime service instead of being launched from inside the `px4` container.
+Phase 2 started from the tagged `phase1-baseline` and kept the same single-vehicle contract while removing the largest remaining architectural compromise: Gazebo is now the first-class standalone runtime service for the maintained stack.
 
 The current phase-2 source of truth is [phase-2-plan.md](./docs/phase-2-plan.md).

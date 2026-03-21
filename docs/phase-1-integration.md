@@ -15,8 +15,8 @@ This document defines the first honest single-vehicle integration baseline.
 - The maintained service set can be built and started together under one `plane_01` contract.
 - `px4` and `ros2_app` depend on `xrce_agent` in the canonical compose stack.
 - `scripts/integration-single-vehicle.sh` validates the agreed namespace, model, world, and workspace assumptions inside the running containers.
-- `scripts/bringup-single-vehicle.sh` is the first actual runtime attempt for one PX4-backed aircraft in Gazebo.
-- `scripts/bringup-single-vehicle-gui.sh` is the local integrated aircraft GUI entrypoint for the current PX4 runtime path.
+- `scripts/bringup-single-vehicle.sh` is the maintained separated-runtime bring-up for one PX4-backed aircraft in Gazebo.
+- `scripts/bringup-single-vehicle-gui.sh` is the local integrated aircraft GUI entrypoint for the maintained separated runtime.
 - `scripts/phase1-launch.sh` is the canonical operator entrypoint for the maintained phase-1 runtime in headless or GUI mode.
 - `scripts/check-px4-telemetry.sh` is the first narrow telemetry discovery check for `/plane_01/fmu/out/...` during the current runtime path.
 - `ros2_ws/src/px4_msgs.repos` pins the minimum ROS-side PX4 message dependency for telemetry type visibility.
@@ -41,10 +41,7 @@ This document defines the first honest single-vehicle integration baseline.
 
 ## What Is Not Yet Wired
 
-- The first actual bring-up currently uses PX4's native Gazebo launch inside the `px4` container rather than the standalone `gazebo` service.
-- The standalone `gazebo` service remains useful for local GUI checks, but it is not the runtime backend for the current one-aircraft milestone.
 - The integrated aircraft GUI path is local-host-only for now and still depends on X11 passthrough in the override stack.
-- The current camera bridge path is a truthful milestone, but it is still a transitional integration shape rather than the final separated runtime architecture.
 - `NAVIGATION_STATE_STAB` is not used as the first validated mode because PX4 requires manual-control availability for it in the current SITL state.
 - The current offboard readiness milestone proves entry and a basic hold stream, but fixed-wing position-style offboard from rest remains constrained by PX4's landed handling.
 - The first real offboard movement primitive in this SITL baseline is `body_rate + thrust`, not a position-step takeoff.
