@@ -10,6 +10,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Phase 1 Scaffold](./docs/phase-1-scaffold.md)
 - [Phase 1 Integration](./docs/phase-1-integration.md)
 - [Phase 2 Plan](./docs/phase-2-plan.md)
+- [Phase 3 Plan](./docs/phase-3-plan.md)
 - [Agent Rules](./AGENTS.md)
 - [Task Template](./docs/task-template.md)
 - [Canonical Compose Stack](./docker-compose.yml)
@@ -129,3 +130,9 @@ Freeze the minimum set of architectural decisions required to let future coding 
 Phase 2 started from the tagged `phase1-baseline` and kept the same single-vehicle contract while removing the largest remaining architectural compromise: Gazebo is now the first-class standalone runtime service for the maintained stack.
 
 The current phase-2 source of truth is [phase-2-plan.md](./docs/phase-2-plan.md).
+
+## Phase 3 Direction
+
+Phase 3 starts from the tagged `phase2-runtime-separation` state and keeps the same single-vehicle contract while adding the first bounded fixed-wing guidance primitive above the current raw movement layer.
+
+The current phase-3 source of truth is [phase-3-plan.md](./docs/phase-3-plan.md).
