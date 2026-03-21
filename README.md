@@ -31,6 +31,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Nav Takeoff Check Script](./scripts/check-nav-takeoff.sh)
 - [Nav Loiter Check Script](./scripts/check-nav-loiter.sh)
 - [Nav Reposition Check Script](./scripts/check-nav-reposition.sh)
+- [Nav Route Check Script](./scripts/check-nav-route.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Current Slice
@@ -86,7 +87,9 @@ The intermediate phase-3 loiter proof is [check-nav-loiter.sh](./scripts/check-n
 
 The current phase-3 guidance proof is [check-nav-reposition.sh](./scripts/check-nav-reposition.sh). It chains `NAV_TAKEOFF`, airborne `mode_loiter`, and `DO_REPOSITION`, requires `VehicleStatus` to remain in `AUTO_LOITER`, and verifies that `VehicleGlobalPosition` approaches the commanded reposition target.
 
-The canonical validation entrypoint for the current phase-3 slice is [phase3-acceptance.sh](./scripts/phase3-acceptance.sh). It now runs the maintained reposition proof in either headless or GUI mode.
+The current phase-3 route proof is [check-nav-route.sh](./scripts/check-nav-route.sh). It keeps the same `NAV_TAKEOFF` and airborne `mode_loiter` chain, then sends two bounded `DO_REPOSITION` targets and verifies that `VehicleGlobalPosition` approaches both commanded route points while `VehicleStatus` remains in `AUTO_LOITER`.
+
+The canonical validation entrypoint for the current phase-3 slice is [phase3-acceptance.sh](./scripts/phase3-acceptance.sh). It now runs the maintained two-target route proof in either headless or GUI mode.
 
 ## Local Gazebo GUI
 
@@ -164,4 +167,4 @@ Phase 3 starts from the tagged `phase2-runtime-separation` state and keeps the s
 
 The current phase-3 source of truth is [phase-3-plan.md](./docs/phase-3-plan.md).
 
-The validated phase-3 guidance chain is now `NAV_TAKEOFF`, airborne `mode_loiter`, and bounded `DO_REPOSITION`. The likely next step after this first waypoint-style proof is chaining multiple guided targets or route-following behavior.
+The validated phase-3 guidance chain is now `NAV_TAKEOFF`, airborne `mode_loiter`, and chained bounded `DO_REPOSITION` targets. The likely next step after this first route-style proof is more explicit route-following behavior or mission-style target sequencing.

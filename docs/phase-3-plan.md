@@ -185,7 +185,7 @@ Phase 3 is complete when all of the following are true:
 - the primitive can be observed in the GUI runtime,
 - the work does not introduce multi-vehicle assumptions.
 
-The current maintained phase-3 slice satisfies these criteria for a bounded airborne guidance chain: `NAV_TAKEOFF`, in-flight `AUTO_LOITER`, and one bounded guided reposition target.
+The current maintained phase-3 slice satisfies these criteria for a bounded airborne guidance chain: `NAV_TAKEOFF`, in-flight `AUTO_LOITER`, and two bounded guided reposition targets.
 
 ## Risks
 
@@ -206,17 +206,17 @@ Phase-3 completion should leave the repo with:
 - updated documentation
 - one clear success metric for the behavior
 
-The next likely phase-3 increment after this maintained reposition slice is chaining multiple guided targets or route-following behavior, not a return to raw offboard movement as the main abstraction.
+The next likely phase-3 increment after this maintained route slice is more explicit route-following or mission-style target sequencing, not a return to raw offboard movement as the main abstraction.
 
 ## Current Increment
 
-The current post-takeoff increment is waypoint-style reposition after loiter.
+The current post-takeoff increment is a bounded two-target route after loiter.
 
 This extends the first bounded `NAV_TAKEOFF` primitive without jumping to full route following:
 
 - the aircraft first enters a meaningful PX4-native takeoff state,
 - then transitions into PX4-native loiter guidance while airborne,
-- then receives one bounded `DO_REPOSITION` target while remaining in loiter guidance,
+- then receives two bounded `DO_REPOSITION` targets while remaining in loiter guidance,
 - the success signal is still telemetry-based and bounded.
 
 Current result:
@@ -229,7 +229,11 @@ Current result:
 - it proves `NAV_TAKEOFF` followed by in-flight `mode_loiter` and `DO_REPOSITION`,
 - it requires `VehicleStatus.nav_state=AUTO_LOITER`,
 - it verifies that `VehicleGlobalPosition` approaches the commanded reposition target,
-- [phase3-acceptance.sh](../scripts/phase3-acceptance.sh) now uses the reposition slice as the maintained phase-3 validation entrypoint.
+- [check-nav-route.sh](../scripts/check-nav-route.sh) exists,
+- it proves `NAV_TAKEOFF` followed by in-flight `mode_loiter` and two sequential `DO_REPOSITION` targets,
+- it requires `VehicleStatus.nav_state=AUTO_LOITER`,
+- it verifies that `VehicleGlobalPosition` approaches both commanded route points,
+- [phase3-acceptance.sh](../scripts/phase3-acceptance.sh) now uses the route slice as the maintained phase-3 validation entrypoint.
 
 ## Initial Next Step
 
