@@ -32,6 +32,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Nav Loiter Check Script](./scripts/check-nav-loiter.sh)
 - [Nav Reposition Check Script](./scripts/check-nav-reposition.sh)
 - [Nav Route Check Script](./scripts/check-nav-route.sh)
+- [Nav Land Check Script](./scripts/check-nav-land.sh)
 - [Source Chat Export](./ChatGPT-Gazebo_PX4_FPV_Setup.md)
 
 ## Current Slice
@@ -89,7 +90,9 @@ The current phase-3 guidance proof is [check-nav-reposition.sh](./scripts/check-
 
 The current phase-3 route proof is [check-nav-route.sh](./scripts/check-nav-route.sh). It keeps the same `NAV_TAKEOFF` and airborne `mode_loiter` chain, then sends two bounded `DO_REPOSITION` targets and verifies that `VehicleGlobalPosition` approaches both commanded route points while `VehicleStatus` remains in `AUTO_LOITER`.
 
-The canonical validation entrypoint for the current phase-3 slice is [phase3-acceptance.sh](./scripts/phase3-acceptance.sh). It now runs the maintained two-target route proof in either headless or GUI mode.
+The closing phase-3 guidance proof is [check-nav-land.sh](./scripts/check-nav-land.sh). It keeps the same `NAV_TAKEOFF` and airborne `mode_loiter` chain, then sends `NAV_LAND`, requires `VehicleStatus.nav_state=AUTO_LAND`, verifies real descent in `VehicleLocalPosition`, and waits for `/plane_01/fmu/out/vehicle_land_detected` to report `landed=true`.
+
+The canonical validation entrypoint for the current phase-3 slice is [phase3-acceptance.sh](./scripts/phase3-acceptance.sh). It now runs the maintained landing proof in either headless or GUI mode.
 
 ## Local Gazebo GUI
 
@@ -167,4 +170,4 @@ Phase 3 starts from the tagged `phase2-runtime-separation` state and keeps the s
 
 The current phase-3 source of truth is [phase-3-plan.md](./docs/phase-3-plan.md).
 
-The validated phase-3 guidance chain is now `NAV_TAKEOFF`, airborne `mode_loiter`, and chained bounded `DO_REPOSITION` targets. The likely next step after this first route-style proof is more explicit route-following behavior or mission-style target sequencing.
+The validated phase-3 guidance chain is now `NAV_TAKEOFF`, airborne `mode_loiter`, bounded route progression, and `NAV_LAND`. That is enough to call phase 3 closed at the single-aircraft guidance level.

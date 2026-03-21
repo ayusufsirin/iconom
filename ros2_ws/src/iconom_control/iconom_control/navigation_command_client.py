@@ -144,6 +144,20 @@ class NavigationCommandClient(Node):
                 },
             )
 
+        if self.command_name == "nav_land":
+            return (
+                VehicleCommand.VEHICLE_CMD_NAV_LAND,
+                {
+                    "param1": 0.0,
+                    "param2": 0.0,
+                    "param3": 0.0,
+                    "param4": yaw,
+                    "param5": target_lat,
+                    "param6": target_lon,
+                    "param7": target_alt,
+                },
+            )
+
         if self.command_name == "nav_loiter_unlim":
             return (
                 VehicleCommand.VEHICLE_CMD_NAV_LOITER_UNLIM,
