@@ -1,28 +1,24 @@
 # SESSION
 
 ## Goal
-Phase 3 is complete and tagged. The immediate goal is to preserve a clean handoff so the next agent can start phase-4 planning or stabilization from a stable baseline.
+Phase 3 is complete and tagged. The immediate goal is to lock the phase-4 dual-aircraft baseline so implementation starts from a pinned isolation contract instead of ad hoc multi-vehicle changes.
 
 ## Current status
-The repo has a validated single-vehicle stack with phase-1 acceptance and a tagged phase-3 guided-flight loop ending in auto landing. The current phase tag is `phase3-guidance-loop` at commit `a82422d`.
+The repo has a validated single-vehicle stack with phase-1 acceptance and a tagged phase-3 guided-flight loop ending in auto landing. A new phase-4 planning doc now defines the dual-aircraft baseline around `plane_01` and `plane_02` with isolated IDs, ports, namespaces, and camera topics.
 
 ## Files touched
+- `docs/phase-4-plan.md`
 - `README.md`
-- `docs/phase-3-plan.md`
-- `scripts/phase3-acceptance.sh`
-- `scripts/check-nav-land.sh`
-- `ros2_ws/src/iconom_control/iconom_control/navigation_command_client.py`
-- `ros2_ws/src/iconom_control/iconom_control/vehicle_land_detected_waiter.py`
-- `ros2_ws/src/iconom_control/setup.py`
+- `SESSION.md`
 
 ## Last completed step
-Validated and committed the `NAV_LAND` guidance slice, then tagged the phase-3 baseline as `phase3-guidance-loop`.
+Defined the phase-4 dual-aircraft planning contract and linked it from the repo start-here docs.
 
 ## Current blocker
 None
 
 ## Next exact step
-None
+Implement the phase-4 runtime contract for `plane_02`: explicit namespace, PX4 system id, XRCE key, MAVLink port, Gazebo model name, and camera topic root, before attempting a dual-aircraft launch.
 
 ## Validation
 ```bash
@@ -33,5 +29,6 @@ ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-nav-land.sh
 ```
 
 ## Notes
-- `phase3-acceptance.sh` now ends on the landing slice, not the route slice.
+- `phase3-acceptance.sh` still ends on the landing slice for the single-aircraft baseline.
+- Phase 4 is intentionally limited to dual-aircraft coexistence and isolation, not swarm coordination.
 - Keep local `.env` and ROS build/install/log outputs untracked.

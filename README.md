@@ -11,6 +11,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Phase 1 Integration](./docs/phase-1-integration.md)
 - [Phase 2 Plan](./docs/phase-2-plan.md)
 - [Phase 3 Plan](./docs/phase-3-plan.md)
+- [Phase 4 Plan](./docs/phase-4-plan.md)
 - [Agent Rules](./AGENTS.md)
 - [Task Template](./docs/task-template.md)
 - [Canonical Compose Stack](./docker-compose.yml)
@@ -171,3 +172,17 @@ Phase 3 starts from the tagged `phase2-runtime-separation` state and keeps the s
 The current phase-3 source of truth is [phase-3-plan.md](./docs/phase-3-plan.md).
 
 The validated phase-3 guidance chain is now `NAV_TAKEOFF`, airborne `mode_loiter`, bounded route progression, and `NAV_LAND`. That is enough to call phase 3 closed at the single-aircraft guidance level.
+
+
+## Phase 4 Direction
+
+Phase 4 starts from the tagged `phase3-guidance-loop` state and keeps the existing single-aircraft guidance baseline intact while adding `plane_02` as the first maintained multi-vehicle increment.
+
+The current phase-4 source of truth is [phase-4-plan.md](./docs/phase-4-plan.md).
+
+The phase-4 goal is not swarm behavior. It is a truthful dual-aircraft isolation proof:
+
+- `plane_01` and `plane_02` in one world,
+- separate PX4 identities, XRCE keys, MAVLink ports, ROS namespaces, and camera topics,
+- independent commandability,
+- one maintained acceptance path for coexistence.
