@@ -27,8 +27,8 @@ Success means:
 1. a mock referee server runs alongside the dual-aircraft runtime,
 2. a competition client connects to the referee and exchanges aircraft state,
 3. an ownship telemetry adapter exposes the local aircraft state to the competition client,
-4. a rival history buffer stores observed rival state history,
-5. a predictor computes bounded rival trajectory predictions from history,
+4. an optional rival history buffer for debugging (not used by predictor),
+5. a predictor computes bounded rival trajectory predictions from its own history,
 6. the proof is scriptable and repeatable in headless mode,
 7. the same coordination can be observed in GUI mode.
 
@@ -41,7 +41,7 @@ Included:
 - one mock referee server for competition context
 - one competition client that connects to the referee
 - one ownship telemetry adapter that publishes local aircraft state to the client
-- one rival history buffer that stores observed rival state history
+- one optional rival history buffer for debugging (not used by predictor)
 - one predictor that computes bounded trajectory predictions
 - acceptance-first validation for server-aware coordination
 
@@ -198,15 +198,17 @@ Success:
 - adapter publishes competition-format state to `/competition/ownship/state`,
 - adapter handles both position and velocity data.
 
-### Slice 4: Rival History Buffer
+### Slice 4: Rival History Buffer (Optional)
 
-Implement the rival buffer that stores observed rival state history.
+Implement the rival buffer for debugging/inspection purposes.
+
+Note: This is optional debug output. The predictor does NOT depend on it.
 
 Success:
 
 - buffer subscribes to `/competition/rival/state`,
 - buffer maintains rolling history of configurable size,
-- buffer exposes history via service call.
+- buffer publishes history to topic for optional inspection.
 
 ### Slice 5: Predictor
 
@@ -243,7 +245,7 @@ Phase 5 is complete when all of the following are true:
 - mock referee server runs and broadcasts dual-aircraft state,
 - competition client connects to referee and distributes state,
 - ownship adapter bridges PX4 telemetry to competition format,
-- rival buffer stores and serves history,
+- rival buffer provides optional debug history output (not used by predictor),
 - predictor computes bounded trajectory prediction,
 - one maintained acceptance script proves server-aware coordination,
 - the same baseline is observable in the GUI runtime.
