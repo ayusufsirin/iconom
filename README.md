@@ -328,3 +328,9 @@ The maintained phase-5 acceptance entrypoint is [phase5-acceptance.sh](./scripts
 ```
 
 The repaired headless acceptance path now passes through the real referee, competition client, telemetry adapter, rival buffer, and predictor checks instead of the earlier fixture-only shortcuts.
+
+## Phase 6 Next
+
+The source-of-truth planning document for the next phase is [docs/phase-6-plan.md](./docs/phase-6-plan.md).
+
+Phase 6 is intentionally narrower than a full fighter round. It starts with deterministic target selection, then adds bounded intercept planning, one pursuit state machine, and one maintained camera-cueing proof before any visual lock logic.

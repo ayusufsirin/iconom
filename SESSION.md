@@ -1,39 +1,29 @@
 # SESSION
 
 ## Goal
-Repair the phase-5 implementation so the maintained checks prove the real ROS/server pipeline and the remaining code-level defects are removed without disturbing the phase-4 baseline.
+Pin phase 6 before implementation so the next work stays bounded, acceptance-first, and consistent with the validated phase-5 server-aware substrate.
 
 ## Current status
-The phase-5 repair slice is complete in the working tree. The real competition-client check passes after the live-mode ownship echo-loop fix, and `./scripts/phase5-acceptance.sh --headless` now passes end to end with the current uncommitted changes.
+Phase 5 is repaired and validated in git through the maintained headless acceptance path. The next source of truth is now `docs/phase-6-plan.md`, which defines deterministic target selection, bounded intercept planning, one pursuit state machine, and one camera-cueing proof as the phase-6 path.
 
 ## Files touched
-- `scripts/check-phase5-competition-client.sh`
-- `scripts/check-phase5-telemetry-adapter.sh`
-- `scripts/check-phase5-rival-history.sh`
-- `scripts/check-phase5-predictor.sh`
-- `ros2_ws/src/iconom_competition/iconom_competition/competition_client.py`
-- `ros2_ws/src/iconom_competition/iconom_competition/ownship_telemetry_adapter.py`
-- `ros2_ws/src/iconom_competition/setup.py`
-- `ros2_ws/src/iconom_competition/package.xml`
+- `docs/phase-6-plan.md`
 - `README.md`
 - `SESSION.md`
 
 ## Last completed step
-Validated the full repaired phase-5 path with `./scripts/phase5-acceptance.sh --headless`, which finished green after the repaired competition-client, telemetry-adapter, rival-history, and predictor checks.
+Added the phase-6 planning baseline and linked it from the README so the next implementation slice starts from a pinned pursuit/cueing contract instead of ad hoc guidance code.
 
 ## Current blocker
 None
 
 ## Next exact step
-None
+Implement the deterministic target-selection slice with one maintained check script and no aircraft guidance yet.
 
 ## Validation
-- `cd /home/joseph/Projects/iconom && ./scripts/check-phase5-competition-client.sh`
-- `cd /home/joseph/Projects/iconom && ./scripts/check-phase5-telemetry-adapter.sh`
-- `cd /home/joseph/Projects/iconom && ./scripts/check-phase5-rival-history.sh`
-- `cd /home/joseph/Projects/iconom && ./scripts/check-phase5-predictor.sh`
-- `cd /home/joseph/Projects/iconom && ./scripts/phase5-acceptance.sh --headless`
+- `cd /home/joseph/Projects/iconom && sed -n '1,240p' docs/phase-6-plan.md`
+- `cd /home/joseph/Projects/iconom && rg -n "Phase 6 Next|phase-6-plan" README.md`
 
 ## Notes
+- Keep phase 6 focused on pursuit guidance and camera cueing; visual lock logic is explicitly out of scope here.
 - Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, and `opencode.json.home_network` out of commits.
-- Preserve the user's existing local phase-5 edits in `competition_client.py`; do not revert them while fixing the remaining review findings.
