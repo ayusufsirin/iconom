@@ -42,7 +42,7 @@ wait_for_referee() {
 
 test_predictor_ros() {
     echo "================================================================"
-    echo "testing predictor ROS pipeline (consumes rival_buffer history)"
+    echo "testing predictor ROS pipeline (direct subscription to rival state)"
     echo "================================================================"
     
     docker compose -f "${ROOT_DIR}/docker-compose.yml" run --rm ros2_app bash -c '
@@ -60,11 +60,6 @@ test_predictor_ros() {
         
         sleep 3
         
-        /workspaces/ros2_ws/install/bin/rival_buffer &
-        BUFFER_PID=$!
-        
-        sleep 3
-        
         /workspaces/ros2_ws/install/bin/predictor &
         PREDICTOR_PID=$!
         
@@ -72,15 +67,15 @@ test_predictor_ros() {
         
         FAIL=0
         ros2 topic list | grep -q "/competition/rival/state" || { echo "FAIL: /competition/rival/state not found"; FAIL=1; }
-        ros2 topic list | grep -q "/rival_buffer/history" || { echo "FAIL: /rival_buffer/history not found"; FAIL=1; }
         ros2 topic list | grep -q "/competition/prediction/rival_position" || { echo "FAIL: /competition/prediction/rival_position not found"; FAIL=1; }
         
         if [ $FAIL -eq 0 ]; then
-            echo "PASS: all topics exist"
-            echo "PASS: predictor subscribes to rival_buffer history and publishes predictions"
+            echo "PASS: /competition/rival/state exists"
+            echo "PASS: /competition/prediction/rival_position exists"
+            echo "PASS: predictor subscribes directly to rival state and publishes predictions"
         fi
         
-        kill $CLIENT_PID $BUFFER_PID $PREDICTOR_PID 2>/dev/null || true
+        kill $CLIENT_PID $PREDICTOR_PID 2>/dev/null || true
         exit $FAIL
     '
 }

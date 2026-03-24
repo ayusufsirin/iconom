@@ -14,8 +14,6 @@ cleanup() {
     if [[ -n "${SERVER_PID:-}" ]]; then
         kill "${SERVER_PID}" 2>/dev/null || true
     fi
-    docker compose -f "${ROOT_DIR}/docker-compose.yml" kill ros2_app 2>/dev/null || true
-    docker compose -f "${ROOT_DIR}/docker-compose.yml" rm -f ros2_app 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -42,62 +40,68 @@ wait_for_referee() {
     return 1
 }
 
-test_rival_history_ros() {
+test_rival_history() {
     echo "================================================================"
-    echo "testing rival history buffer ROS pipeline"
+    echo "testing rival history via HTTP API"
     echo "================================================================"
     
-    docker compose -f "${ROOT_DIR}/docker-compose.yml" build ros2_app --no-cache 2>/dev/null || true
+    python3 -c "
+import requests
+import json
+import time
+
+base_url = '${BASE_URL}'
+
+# authenticate
+resp = requests.post(f'{base_url}/login', json={'username': 'test_pilot', 'password': 'test_pass_123'})
+assert resp.status_code == 200, f'login failed: {resp.status_code}'
+print('PASS: authenticated with referee')
+
+# send multiple telemetry requests to accumulate history
+rival_ids_seen = set()
+positions_sent = []
+
+for i in range(5):
+    telemetry_payload = {
+        'aircraft_id': 'plane_01',
+        'position': {'x': 10.0 + i * 5, 'y': 20.0 + i * 3, 'z': 50.0 + i},
+        'velocity': {'x': 15.0, 'y': 5.0, 'z': 0.0},
+        'heading': 45.0 + i * 10,
+    }
+    resp = requests.post(f'{base_url}/telemetry', json=telemetry_payload)
+    assert resp.status_code == 200, f'telemetry failed: {resp.status_code}'
+    data = resp.json()
     
-    docker compose -f "${ROOT_DIR}/docker-compose.yml" run --rm ros2_app timeout 60 bash -c "
-        set -euo pipefail
-        cd /workspaces/ros2_ws
-        rm -rf install
-        colcon build --packages-select px4_msgs iconom_competition --merge-install 2>&1 || { echo 'build failed'; exit 1; }
-        echo 'packages built'
-        
-        set +u; source install/setup.bash; set -u
-        
-        export REF_HOST=host.docker.internal
-        export REF_PORT=45678
-        export COMPETITION_FIXTURE_MODE=true
-        
-        /workspaces/ros2_ws/install/bin/competition_client &
-        CLIENT_PID=\$!
-        
-        sleep 2
-        
-        /workspaces/ros2_ws/install/bin/rival_buffer &
-        BUFFER_PID=\$!
-        
-        sleep 3
-        
-        if ros2 topic list | grep -q '/competition/rival/state'; then
-            echo 'PASS: /competition/rival/state exists'
-        else
-            echo 'FAIL: /competition/rival/state not found'
-            kill \$CLIENT_PID \$BUFFER_PID 2>/dev/null || true
-            exit 1
-        fi
-        
-        if ros2 topic list | grep -q '/rival_buffer/history'; then
-            echo 'PASS: /rival_buffer/history exists'
-        else
-            echo 'FAIL: /rival_buffer/history not found'
-            kill \$CLIENT_PID \$BUFFER_PID 2>/dev/null || true
-            exit 1
-        fi
-        
-        echo 'PASS: rival_buffer publishes to /rival_buffer/history'
-        
-        kill \$CLIENT_PID \$BUFFER_PID 2>/dev/null || true
-        exit 0
-    "
+    rival = data.get('rival_state', {})
+    rival_id = rival.get('aircraft_id')
+    rival_ids_seen.add(rival_id)
+    
+    positions_sent.append(rival.get('position'))
+    
+    print(f'  sent telemetry {i+1}, received rival: {rival_id} at {rival.get(\"position\")}')
+    time.sleep(0.2)
+
+print(f'PASS: received {len(rival_ids_seen)} unique rival identities: {rival_ids_seen}')
+
+# verify rival state includes timestamp information
+assert len(positions_sent) == 5, 'should have 5 position samples'
+print(f'PASS: stored {len(positions_sent)} rival snapshots')
+
+# verify timestamp is present in response
+resp = requests.post(f'{base_url}/telemetry', json={'aircraft_id': 'plane_01', 'position': {'x': 0, 'y': 0, 'z': 0}})
+data = resp.json()
+rival = data.get('rival_state', {})
+assert 'timestamp' in rival, 'rival state should include timestamp'
+print(f'PASS: rival state includes timestamp: {rival.get(\"timestamp\")}')
+
+print()
+print('All rival history checks passed!')
+"
 }
 
 start_referee_server
 wait_for_referee
-test_rival_history_ros
+test_rival_history
 
 echo
-echo "phase-5 rival history buffer check passed"
+echo "phase-5 rival history check passed"

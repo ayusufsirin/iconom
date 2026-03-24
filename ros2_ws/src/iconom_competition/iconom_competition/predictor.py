@@ -8,11 +8,11 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 
-from geometry_msgs.msg import PoseStamped, PoseArray
+from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Header
 
 
-RIVAL_BUFFER_HISTORY_TOPIC = "/rival_buffer/history"
+RIVAL_STATE_TOPIC = "/competition/rival/state"
 PREDICTION_TOPIC = "/competition/prediction/rival_position"
 
 DEFAULT_BUFFER_SIZE = 60
@@ -42,10 +42,10 @@ class Predictor(Node):
             depth=10,
         )
         
-        self.history_sub = self.create_subscription(
-            PoseArray,
-            RIVAL_BUFFER_HISTORY_TOPIC,
-            self._handle_history,
+        self.rival_sub = self.create_subscription(
+            PoseStamped,
+            RIVAL_STATE_TOPIC,
+            self._handle_rival_state,
             qos,
         )
         
@@ -57,45 +57,35 @@ class Predictor(Node):
         
         self.timer = self.create_timer(0.5, self._publish_predictions)
         
-        self.get_logger().info(f"subscribed to {RIVAL_BUFFER_HISTORY_TOPIC}")
+        self.get_logger().info(f"subscribed to {RIVAL_STATE_TOPIC}")
         self.get_logger().info(f"predictions published to {PREDICTION_TOPIC}")
 
-    def _handle_history(self, msg: PoseArray):
+    def _handle_rival_state(self, msg: PoseStamped):
         rival_id = msg.header.frame_id
         current_time = self.get_clock().now().nanoseconds / 1e9
         
         if rival_id not in self.history_buffer:
             self.history_buffer[rival_id] = deque(maxlen=self.buffer_size)
         
-        if not msg.poses:
-            return
+        entry = {
+            "timestamp": current_time,
+            "position": {
+                "x": msg.pose.position.x,
+                "y": msg.pose.position.y,
+                "z": msg.pose.position.z,
+            },
+            "orientation": {
+                "x": msg.pose.orientation.x,
+                "y": msg.pose.orientation.y,
+                "z": msg.pose.orientation.z,
+                "w": msg.pose.orientation.w,
+            },
+        }
         
-        time_per_sample = 1.0 / 60.0
-        num_poses = len(msg.poses)
-        
-        for i in range(num_poses):
-            pose = msg.poses[i]
-            sample_time = current_time - (num_poses - 1 - i) * time_per_sample
-            
-            entry = {
-                "timestamp": sample_time,
-                "position": {
-                    "x": pose.position.x,
-                    "y": pose.position.y,
-                    "z": pose.position.z,
-                },
-                "orientation": {
-                    "x": pose.orientation.x,
-                    "y": pose.orientation.y,
-                    "z": pose.orientation.z,
-                    "w": pose.orientation.w,
-                },
-            }
-            
-            self.history_buffer[rival_id].append(entry)
+        self.history_buffer[rival_id].append(entry)
         
         self.get_logger().debug(
-            f"updated rival {rival_id} from buffer, buffer size: {len(self.history_buffer[rival_id])}"
+            f"stored rival {rival_id}, buffer size: {len(self.history_buffer[rival_id])}"
         )
 
     def _estimate_velocity(self, buffer: deque) -> Optional[Dict[str, float]]:

@@ -119,11 +119,13 @@ Recommended:
 
 ## Rival History Buffer Contract
 
-The rival history buffer stores observed rival aircraft state history:
+The rival history buffer stores observed rival aircraft state history for debugging/inspection purposes only:
 
 - subscribes to `/competition/rival/state`
 - maintains a rolling buffer of the last N position, velocity, and heading observations
-- publishes history to a topic for consumption by other components
+- publishes history to a topic for optional inspection
+
+Note: The rival_buffer is NOT part of the prediction path. It is optional debug output only.
 
 Recommended:
 
@@ -135,10 +137,10 @@ Recommended:
 
 ## Predictor Contract
 
-The predictor computes bounded trajectory predictions from rival history:
+The predictor is the official maintained owner of buffered rival history for prediction:
 
-- subscribes to rival_buffer's history output topic (`/rival_buffer/history`)
-- uses buffered history from rival_buffer to estimate velocity
+- subscribes directly to `/competition/rival/state` for real-time rival state
+- maintains its own rolling history buffer for velocity estimation
 - computes linear extrapolation prediction of future rival position
 - publishes predicted rival position to a topic for consumption
 
@@ -146,7 +148,7 @@ Recommended:
 
 - package name: `iconom_predictor`
 - predictor script: `predictor.py`
-- input topic: `/rival_buffer/history` (PoseArray from rival_buffer)
+- input topic: `/competition/rival/state`
 - output topic: `/competition/prediction/rival_position`
 - prediction horizon: configurable, default 2 seconds
 
@@ -158,9 +160,9 @@ All phase-5 topics follow the `/competition/...` root:
 - `/competition/ownship/state` - local aircraft state for referee (published by ownship_telemetry_adapter or competition_client in fixture mode)
 - `/competition/prediction/rival_position` - predicted rival trajectory (published by predictor)
 
-The `/rival_buffer/...` topics are the official source of buffered history:
+Optional debug topics:
 
-- `/rival_buffer/history` - buffered rival history as PoseArray (published by rival_buffer)
+- `/rival_buffer/history` - buffered rival history for inspection only (published by rival_buffer, NOT used by predictor)
 
 Note: `/referee/state` is internal to the referee server's HTTP API and not a ROS topic.
 
