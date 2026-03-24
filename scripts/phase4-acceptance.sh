@@ -60,6 +60,7 @@ CHECKS+=(
   "${ROOT_DIR}/scripts/check-phase4-isolation.sh"
   "${ROOT_DIR}/scripts/check-phase4-command-isolation.sh"
   "${ROOT_DIR}/scripts/check-phase4-mode-isolation.sh"
+  "${ROOT_DIR}/scripts/check-phase4-nav-isolation.sh"
 )
 
 echo "iconom phase-4 acceptance"

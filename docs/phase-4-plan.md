@@ -158,7 +158,17 @@ Success:
 - `plane_02` stays outside `OFFBOARD` until explicitly targeted,
 - `plane_02` can then enter `OFFBOARD` independently while `plane_01` stays unchanged.
 
-### Slice 6: Acceptance And GUI Confirmation
+### Slice 6: Navigation Isolation
+
+Prove that one aircraft can execute a bounded PX4-native navigation action without mutating the other.
+
+Success:
+
+- `plane_01` can execute `NAV_TAKEOFF` -> `mode_loiter` -> `DO_REPOSITION`,
+- `plane_01` approaches the commanded reposition target,
+- `plane_02` stays disarmed and unchanged while `plane_01` is targeted.
+
+### Slice 7: Acceptance And GUI Confirmation
 
 Add the maintained validation path for the dual-aircraft baseline.
 
@@ -196,7 +206,7 @@ Phase-4 completion should leave the repo with:
 - one maintained dual-aircraft runtime path
 - one maintained dual-aircraft acceptance script
 - updated documentation for the two-aircraft contract
-- isolated telemetry, camera, command, and mode proofs for both aircraft
+- isolated telemetry, camera, command, mode, and bounded nav proofs for both aircraft
 
 The next likely increment after this closed phase-4 slice is the first bounded multi-vehicle coordination layer, not a larger uncontrolled expansion of vehicle count.
 

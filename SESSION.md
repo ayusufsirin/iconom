@@ -1,12 +1,13 @@
 # SESSION
 
 ## Goal
-Phase 3 is complete and tagged. The immediate goal is to extend the packaged phase-4 dual-aircraft baseline beyond command isolation.
+Phase 3 is complete and tagged. The immediate goal is to extend the packaged phase-4 dual-aircraft baseline beyond mode isolation.
 
 ## Current status
-The repo has a tagged single-aircraft guidance loop through landing, a validated phase-4 runtime contract for `plane_02`, a passing dual-aircraft isolation proof, a passing dual-aircraft command-isolation proof, a passing dual-aircraft mode-isolation proof, and a maintained `phase4-acceptance.sh` entrypoint that now passes end to end.
+The repo has a tagged single-aircraft guidance loop through landing, a validated phase-4 runtime contract for `plane_02`, a passing dual-aircraft isolation proof, a passing dual-aircraft command-isolation proof, a passing dual-aircraft mode-isolation proof, a bounded dual-aircraft nav-isolation proof, and a maintained `phase4-acceptance.sh` entrypoint that now passes end to end.
 
 ## Files touched
+- `scripts/check-phase4-nav-isolation.sh`
 - `scripts/check-phase4-mode-isolation.sh`
 - `scripts/phase4-acceptance.sh`
 - `README.md`
@@ -14,13 +15,13 @@ The repo has a tagged single-aircraft guidance loop through landing, a validated
 - `SESSION.md`
 
 ## Last completed step
-Added and validated `./scripts/check-phase4-mode-isolation.sh`, then reran `./scripts/phase4-acceptance.sh --headless` successfully.
+Added and validated `./scripts/check-phase4-nav-isolation.sh`, then reran `./scripts/phase4-acceptance.sh --headless` successfully.
 
 ## Current blocker
 None
 
 ## Next exact step
-Add the next phase-4 independent-control proof after mode isolation, starting with a bounded per-aircraft nav action such as `DO_REPOSITION` on one aircraft without mutating the other.
+Decide whether phase 4 should stop at bounded per-aircraft nav isolation or continue into a first coordinated multi-vehicle behavior slice.
 
 ## Validation
 ```bash
@@ -29,6 +30,7 @@ cd /home/joseph/Projects/iconom
 ./scripts/check-phase4-isolation.sh
 ./scripts/check-phase4-command-isolation.sh
 ./scripts/check-phase4-mode-isolation.sh
+./scripts/check-phase4-nav-isolation.sh
 ./scripts/phase4-acceptance.sh --headless
 ```
 

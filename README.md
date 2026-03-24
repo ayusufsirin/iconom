@@ -26,6 +26,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Phase 4 Isolation Check Script](./scripts/check-phase4-isolation.sh)
 - [Phase 4 Command Isolation Check Script](./scripts/check-phase4-command-isolation.sh)
 - [Phase 4 Mode Isolation Check Script](./scripts/check-phase4-mode-isolation.sh)
+- [Phase 4 Nav Isolation Check Script](./scripts/check-phase4-nav-isolation.sh)
 - [Phase 4 Acceptance Script](./scripts/phase4-acceptance.sh)
 - [PX4 Telemetry Check Script](./scripts/check-px4-telemetry.sh)
 - [Camera Bridge Check Script](./scripts/check-camera-bridge.sh)
@@ -200,4 +201,6 @@ The first phase-4 control proof is [check-phase4-command-isolation.sh](./scripts
 
 The next phase-4 control proof is [check-phase4-mode-isolation.sh](./scripts/check-phase4-mode-isolation.sh). It reuses the same dual-aircraft runtime, arms both aircraft, starts namespaced offboard publishers, sends `mode_offboard` to `plane_01` without changing `plane_02`, then sends `mode_offboard` to `plane_02` independently and verifies that both aircraft keep separate mode-state transitions.
 
-The maintained phase-4 entrypoint is [phase4-acceptance.sh](./scripts/phase4-acceptance.sh). It runs the current dual-aircraft contract, isolation, command-isolation, and mode-isolation proofs in sequence.
+The next phase-4 control proof is [check-phase4-nav-isolation.sh](./scripts/check-phase4-nav-isolation.sh). It keeps `plane_02` disarmed, runs the bounded `NAV_TAKEOFF` -> `mode_loiter` -> `DO_REPOSITION` chain on `plane_01`, and verifies that the repositioned aircraft moves toward its commanded target without mutating `plane_02`.
+
+The maintained phase-4 entrypoint is [phase4-acceptance.sh](./scripts/phase4-acceptance.sh). It runs the current dual-aircraft contract, isolation, command-isolation, mode-isolation, and nav-isolation proofs in sequence.
