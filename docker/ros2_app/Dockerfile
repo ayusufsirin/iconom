@@ -20,8 +20,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-colcon-common-extensions \
     python3-rosdep \
     python3-vcstool \
+    python3-pip \
     ros-humble-ros-base \
  && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir requests
 
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8

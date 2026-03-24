@@ -43,25 +43,26 @@ wait_for_referee() {
     return 1
 }
 
-build_competition_package() {
+build_and_run_competition_package() {
     echo "================================================================"
-    echo "building iconom_competition package"
+    echo "building and testing iconom_competition package"
     echo "================================================================"
     docker compose build ros2_app --no-cache 2>/dev/null || true
-    docker compose run --rm ros2_app bash -c "cd /workspaces/ros2_ws && colcon build --packages-select iconom_competition 2>&1" || {
-        echo "build failed - running with mocked deps"
-        return 0
-    }
-    echo "package built successfully"
-}
-
-run_competition_client() {
     docker compose run --rm ros2_app bash -c "
+        set -euo pipefail
         cd /workspaces/ros2_ws
-        source install/setup.bash
+        rm -rf install
+        colcon build --packages-select px4_msgs iconom_competition --merge-install 2>&1 || {
+            echo 'build failed'
+            exit 1
+        }
+        echo 'package built successfully'
+        
+        set +u; source install/setup.bash; set -u
         export REF_HOST=host.docker.internal
         export REF_PORT=45678
-        ros2 run iconom_competition competition_client &
+        /workspaces/ros2_ws/install/bin/competition_client &
+        CLIENT_PID=$!
         CLIENT_PID=\$!
         sleep 3
         if ros2 topic list | grep -q '/competition/rival/state'; then
@@ -129,8 +130,7 @@ test_client_connection
 echo "================================================================"
 echo "building and testing ROS competition client"
 echo "================================================================"
-build_competition_package
-run_competition_client
+build_and_run_competition_package
 
 echo
 echo "phase-5 competition client check passed"
