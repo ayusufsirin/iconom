@@ -296,3 +296,24 @@ To run the rival history buffer check:
 ```bash
 ./scripts/check-phase5-rival-history.sh
 ```
+
+The phase-5 predictor is in [ros2_ws/src/iconom_competition/iconom_competition/predictor.py](./ros2_ws/src/iconom_competition/iconom_competition/predictor.py). It provides a ROS 2 node that:
+
+- subscribes to `/competition/rival/state` for rival state updates
+- maintains a rolling buffer to estimate rival velocity
+- publishes predicted rival position to `/competition/prediction/rival_position`
+- uses a configurable prediction horizon (default 2 seconds)
+
+To run the predictor check:
+
+```bash
+./scripts/check-phase5-predictor.sh
+```
+
+## Phase 5 Daily Use
+
+The maintained phase-5 acceptance entrypoint is [phase5-acceptance.sh](./scripts/phase5-acceptance.sh). It runs all phase-5 checks in sequence:
+
+```bash
+./scripts/phase5-acceptance.sh --headless
+```
