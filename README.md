@@ -12,6 +12,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Phase 2 Plan](./docs/phase-2-plan.md)
 - [Phase 3 Plan](./docs/phase-3-plan.md)
 - [Phase 4 Plan](./docs/phase-4-plan.md)
+- [Phase 5 Plan](./docs/phase-5-plan.md)
 - [Agent Rules](./AGENTS.md)
 - [Task Template](./docs/task-template.md)
 - [Canonical Compose Stack](./docker-compose.yml)
@@ -210,3 +211,27 @@ The maintained phase-4 entrypoint is [phase4-acceptance.sh](./scripts/phase4-acc
 The maintained dual-aircraft GUI path is [bringup-phase4-gui.sh](./scripts/bringup-phase4-gui.sh). It keeps one Gazebo window open with `plane_01` and `plane_02` attached to the same world and uses explicit phase-4 spawn poses so both aircraft start at the rc_cessna model's native ground-contact height instead of visually clipping into it.
 
 The next phase-4 navigation proof is [check-phase4-dual-nav-loop.sh](./scripts/check-phase4-dual-nav-loop.sh). It keeps one shared dual-aircraft runtime, runs the bounded phase-3-style `NAV_TAKEOFF` -> `mode_loiter` -> `NAV_LAND` loop for `plane_01`, confirms `plane_02` stayed untouched, then runs the same loop for `plane_02` in the same sim.
+
+## Phase 5 Direction
+
+Phase 5 starts from the tagged `phase4-dual-aircraft-baseline` state and keeps the existing dual-aircraft coexistence baseline intact while adding the first server-aware two-aircraft substrate.
+
+The current phase-5 source of truth is [phase-5-plan.md](./docs/phase-5-plan.md).
+
+The phase-5 goal is not intercept execution or weapon engagement. It is a truthful server-aware coordination and bounded prediction proof:
+
+- mock referee server runs alongside dual-aircraft runtime,
+- competition client connects to referee and exchanges aircraft state,
+- ownship telemetry adapter bridges PX4 telemetry to competition format,
+- rival history buffer stores observed rival state history,
+- predictor computes bounded trajectory predictions from history.
+
+The phase-5 mock referee contract pins `iconom_referee` as the package name, `referee_server.py` as the server script, and port `45678` as the default communication channel.
+
+The phase-5 competition client contract pins `iconom_competition` as the package name, `competition_client.py` as the client script, and `/competition/rival/state` and `/competition/ownship/state` as the primary ROS topics.
+
+The phase-5 ownship adapter contract pins `iconom_telemetry_adapter` as the package name, `ownship_adapter.py` as the adapter script, and `/competition/ownship/state` as the output topic fed by `/plane_01/fmu/out/vehicle_local_position`.
+
+The phase-5 rival buffer contract pins `iconom_rival_buffer` as the package name, `rival_buffer.py` as the buffer script, and `/rival_buffer/get_history` as the service interface with a default 60-sample rolling buffer.
+
+The phase-5 predictor contract pins `iconom_predictor` as the package name, `predictor.py` as the predictor script, and `/competition/prediction/rival_position` as the output topic with a default 2-second prediction horizon.
