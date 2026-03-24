@@ -123,29 +123,30 @@ The rival history buffer stores observed rival aircraft state history:
 
 - subscribes to `/competition/rival/state`
 - maintains a rolling buffer of the last N position, velocity, and heading observations
-- provides history access for the predictor component
+- publishes history to a topic for consumption by other components
 
 Recommended:
 
 - package name: `iconom_rival_buffer`
 - buffer script: `rival_buffer.py`
 - input topic: `/competition/rival/state`
-- output service: `/rival_buffer/get_history`
+- output topic: `/rival_buffer/history`
 - default buffer size: 60 samples (1 second at 60 Hz)
 
 ## Predictor Contract
 
 The predictor computes bounded trajectory predictions from rival history:
 
-- queries the rival history buffer for recent observations
-- computes a linear or simple Kalman-style prediction of future rival position
+- subscribes directly to `/competition/rival/state` for real-time updates
+- maintains its own rolling history buffer for velocity estimation
+- computes linear extrapolation prediction of future rival position
 - publishes predicted rival position to a topic for consumption
 
 Recommended:
 
 - package name: `iconom_predictor`
 - predictor script: `predictor.py`
-- input: `/rival_buffer/get_history` service
+- input topic: `/competition/rival/state`
 - output topic: `/competition/prediction/rival_position`
 - prediction horizon: configurable, default 2 seconds
 

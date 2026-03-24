@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REF_HOST="${REF_HOST:-localhost}"
-REF_PORT="${REFERE_SERVER_PORT:-45678}"
+REF_PORT="${REFEREE_SERVER_PORT:-45678}"
 BASE_URL="http://${REF_HOST}:${REF_PORT}"
 
 echo "iconom phase-5 telemetry adapter check"

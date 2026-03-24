@@ -233,7 +233,7 @@ The phase-5 competition client contract pins `iconom_competition` as the package
 
 The phase-5 ownship adapter contract pins `iconom_telemetry_adapter` as the package name, `ownship_adapter.py` as the adapter script, and `/competition/ownship/state` as the output topic fed by `/plane_01/fmu/out/vehicle_local_position`.
 
-The phase-5 rival buffer contract pins `iconom_rival_buffer` as the package name, `rival_buffer.py` as the buffer script, and `/rival_buffer/get_history` as the service interface with a default 60-sample rolling buffer.
+The phase-5 rival buffer contract pins `iconom_rival_buffer` as the package name, `rival_buffer.py` as the buffer script, and `/rival_buffer/history` as the output topic with a default 60-sample rolling buffer.
 
 The phase-5 predictor contract pins `iconom_predictor` as the package name, `predictor.py` as the predictor script, and `/competition/prediction/rival_position` as the output topic with a default 2-second prediction horizon.
 
@@ -258,11 +258,14 @@ docker compose --profile phase5 up referee_server
 
 The phase-5 competition client implementation is in [ros2_ws/src/iconom_competition](./ros2_ws/src/iconom_competition). It provides a ROS 2 node that:
 
+- subscribes to `/competition/ownship/state` for live ownship telemetry from the adapter
 - authenticates with the mock referee server
 - requests server time
-- sends fixture telemetry packets
+- sends telemetry packets to the referee
 - publishes parsed rival state to `/competition/rival/state`
 - publishes ownship state to `/competition/ownship/state`
+
+By default, the competition client expects live ownship telemetry from the ownship telemetry adapter. To run in fixture-only mode (for testing without the full PX4 stack), set `COMPETITION_FIXTURE_MODE=true`.
 
 To run the competition client check:
 
