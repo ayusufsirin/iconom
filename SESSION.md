@@ -1,24 +1,26 @@
 # SESSION
 
 ## Goal
-Phase 3 is complete and tagged. The immediate goal is to extend the packaged phase-4 dual-aircraft baseline beyond arm isolation.
+Phase 3 is complete and tagged. The immediate goal is to extend the packaged phase-4 dual-aircraft baseline beyond command isolation.
 
 ## Current status
-The repo has a tagged single-aircraft guidance loop through landing, a validated phase-4 runtime contract for `plane_02`, a passing dual-aircraft isolation proof, a passing dual-aircraft command-isolation proof, and a maintained `phase4-acceptance.sh` entrypoint that chains those checks.
+The repo has a tagged single-aircraft guidance loop through landing, a validated phase-4 runtime contract for `plane_02`, a passing dual-aircraft isolation proof, a passing dual-aircraft command-isolation proof, a passing dual-aircraft mode-isolation proof, and a maintained `phase4-acceptance.sh` entrypoint that now passes end to end.
 
 ## Files touched
+- `scripts/check-phase4-mode-isolation.sh`
 - `scripts/phase4-acceptance.sh`
 - `README.md`
+- `docs/phase-4-plan.md`
 - `SESSION.md`
 
 ## Last completed step
-Added and validated `./scripts/phase4-acceptance.sh` end to end.
+Added and validated `./scripts/check-phase4-mode-isolation.sh`, then reran `./scripts/phase4-acceptance.sh --headless` successfully.
 
 ## Current blocker
 None
 
 ## Next exact step
-Add the next phase-4 independent-control proof after arming, starting with a per-aircraft mode-change check that verifies one vehicle can change mode without mutating the other.
+Add the next phase-4 independent-control proof after mode isolation, starting with a bounded per-aircraft nav action such as `DO_REPOSITION` on one aircraft without mutating the other.
 
 ## Validation
 ```bash
@@ -26,6 +28,7 @@ cd /home/joseph/Projects/iconom
 ./scripts/check-phase4-runtime-contract.sh
 ./scripts/check-phase4-isolation.sh
 ./scripts/check-phase4-command-isolation.sh
+./scripts/check-phase4-mode-isolation.sh
 ./scripts/phase4-acceptance.sh --headless
 ```
 

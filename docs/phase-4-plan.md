@@ -148,7 +148,17 @@ Success:
 - `plane_02` can be armed independently,
 - a mode or nav action on one aircraft leaves the other aircraft unchanged.
 
-### Slice 5: Acceptance And GUI Confirmation
+### Slice 5: Mode Isolation
+
+Prove that one aircraft can change mode without mutating the other.
+
+Success:
+
+- `plane_01` can enter `OFFBOARD` independently,
+- `plane_02` stays outside `OFFBOARD` until explicitly targeted,
+- `plane_02` can then enter `OFFBOARD` independently while `plane_01` stays unchanged.
+
+### Slice 6: Acceptance And GUI Confirmation
 
 Add the maintained validation path for the dual-aircraft baseline.
 
@@ -186,7 +196,7 @@ Phase-4 completion should leave the repo with:
 - one maintained dual-aircraft runtime path
 - one maintained dual-aircraft acceptance script
 - updated documentation for the two-aircraft contract
-- isolated telemetry, camera, and command proofs for both aircraft
+- isolated telemetry, camera, command, and mode proofs for both aircraft
 
 The next likely increment after this closed phase-4 slice is the first bounded multi-vehicle coordination layer, not a larger uncontrolled expansion of vehicle count.
 
