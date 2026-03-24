@@ -214,8 +214,8 @@ Implement the predictor that computes bounded trajectory predictions.
 
 Success:
 
-- predictor queries buffer history,
-- predictor computes simple trajectory extrapolation,
+- predictor subscribes directly to rival state topic,
+- predictor maintains its own history buffer for velocity estimation,
 - predictor publishes predicted position to `/competition/prediction/rival_position`.
 
 ### Slice 6: Headless Acceptance Path
