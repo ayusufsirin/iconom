@@ -25,6 +25,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Phase 4 Runtime Contract Check Script](./scripts/check-phase4-runtime-contract.sh)
 - [Phase 4 Isolation Check Script](./scripts/check-phase4-isolation.sh)
 - [Phase 4 Command Isolation Check Script](./scripts/check-phase4-command-isolation.sh)
+- [Phase 4 Acceptance Script](./scripts/phase4-acceptance.sh)
 - [PX4 Telemetry Check Script](./scripts/check-px4-telemetry.sh)
 - [Camera Bridge Check Script](./scripts/check-camera-bridge.sh)
 - [Camera Subscriber Check Script](./scripts/check-camera-subscriber.sh)
@@ -195,3 +196,5 @@ The phase-4 runtime contract guard is [check-phase4-runtime-contract.sh](./scrip
 The first live phase-4 runtime proof is [check-phase4-isolation.sh](./scripts/check-phase4-isolation.sh). It brings up `plane_01` and `plane_02` together under the `phase4` compose profile and verifies that both telemetry roots and both camera topic roots appear in ROS 2 without namespace collisions.
 
 The first phase-4 control proof is [check-phase4-command-isolation.sh](./scripts/check-phase4-command-isolation.sh). It reuses the same dual-aircraft runtime, arms `plane_01` without changing `plane_02`, then arms `plane_02` independently and verifies that both aircraft keep separate armed-state transitions.
+
+The maintained phase-4 entrypoint is [phase4-acceptance.sh](./scripts/phase4-acceptance.sh). It runs the current dual-aircraft contract, isolation, and command-isolation proofs in sequence.
