@@ -20,6 +20,7 @@ setup(
         "console_scripts": [
             "target_selector = iconom_guidance.target_selector:main",
             "intercept_planner = iconom_guidance.intercept_planner:main",
+            "pursuit_state_machine = iconom_guidance.pursuit_state_machine:main",
         ],
     },
 )

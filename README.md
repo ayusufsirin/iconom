@@ -358,3 +358,15 @@ To run the intercept-planner check:
 ```
 
 The maintained check launches the real planner, injects controlled ownship and predicted-target inputs, and requires both clamp-to-bound behavior and in-bounds passthrough behavior before it passes.
+
+## Phase 6 Pursuit State Machine
+
+The third phase-6 slice is the pursuit state machine in [ros2_ws/src/iconom_guidance](./ros2_ws/src/iconom_guidance). It consumes the selected target and bounded intercept target, publishes the current pursuit state on `/guidance/pursuit_state`, and republishes the pursuit goal on `/guidance/pursuit_goal` only while the machine is in `pursue`.
+
+To run the pursuit-state-machine check:
+
+```bash
+./scripts/check-phase6-pursuit-state-machine.sh
+```
+
+The maintained check launches the real state machine and requires the deterministic transition sequence `idle -> search -> pursue -> reacquire -> idle` from controlled topic inputs.
