@@ -20,6 +20,7 @@ setup(
         "console_scripts": [
             "competition_client = iconom_competition.competition_client:main",
             "ownship_telemetry_adapter = iconom_competition.ownship_telemetry_adapter:main",
+            "rival_buffer = iconom_competition.rival_buffer:main",
         ],
     },
 )

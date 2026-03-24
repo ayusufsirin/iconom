@@ -1,30 +1,29 @@
 # SESSION
 
 ## Goal
-Implement phase 5 slice 4 - the live ownship telemetry adapter. The immediate engineering goal is to map live ROS/PX4 state to competition telemetry and send it to the mock referee server.
+Implement phase 5 slice 5 - the rival state history buffer. The immediate engineering goal is to accumulate rival snapshots into a time-ordered history buffer suitable for downstream prediction logic.
 
 ## Current status
-Phase 5 plan exists at `docs/phase-5-plan.md`. The mock referee server and competition client are complete. The ownship telemetry adapter is now implemented.
+Phase 5 plan exists at `docs/phase-5-plan.md`. The mock referee server, competition client, and ownship telemetry adapter are complete. The rival history buffer is now implemented.
 
 ## Files touched
-- `ros2_ws/src/iconom_competition/package.xml`
 - `ros2_ws/src/iconom_competition/setup.py`
-- `ros2_ws/src/iconom_competition/iconom_competition/ownship_telemetry_adapter.py`
-- `scripts/check-phase5-telemetry-adapter.sh`
+- `ros2_ws/src/iconom_competition/iconom_competition/rival_buffer.py`
+- `scripts/check-phase5-rival-history.sh`
 - `README.md`
 - `SESSION.md`
 
 ## Last completed step
-Implemented ownship_telemetry_adapter.py that subscribes to `/plane_01/fmu/out/vehicle_local_position`, maps live PX4 state to competition telemetry format, authenticates with referee, and sends telemetry at 1-second intervals.
+Implemented rival_buffer.py that subscribes to `/competition/rival/state`, maintains a rolling 60-sample buffer per rival, stores position/orientation/timestamp, and publishes to `/rival_buffer/history` for inspection.
 
 ## Current blocker
 None
 
 ## Next exact step
-Run `./scripts/check-phase5-telemetry-adapter.sh` to verify the telemetry adapter works correctly.
+Run `./scripts/check-phase5-rival-history.sh` to verify the rival history buffer works correctly.
 
 ## Validation
-- `cd /home/joseph/Projects/iconom && ./scripts/check-phase5-telemetry-adapter.sh`
+- `cd /home/joseph/Projects/iconom && ./scripts/check-phase5-rival-history.sh`
 
 ## Notes
 - Keep `QGroundControl-x86_64.AppImage` and `opencode.json` out of commits.

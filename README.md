@@ -283,3 +283,16 @@ To run the telemetry adapter check:
 ```bash
 ./scripts/check-phase5-telemetry-adapter.sh
 ```
+
+The phase-5 rival history buffer is in [ros2_ws/src/iconom_competition/iconom_competition/rival_buffer.py](./ros2_ws/src/iconom_competition/iconom_competition/rival_buffer.py). It provides a ROS 2 node that:
+
+- subscribes to `/competition/rival/state` for rival state updates
+- maintains a rolling buffer of 60 samples (configurable via `RIVAL_BUFFER_SIZE`)
+- stores position, orientation, and timestamp for each sample
+- publishes history to `/rival_buffer/history` for inspection
+
+To run the rival history buffer check:
+
+```bash
+./scripts/check-phase5-rival-history.sh
+```
