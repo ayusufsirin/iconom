@@ -41,8 +41,10 @@ class CompetitionClient(Node):
         
         self.rival_state_pub = self.create_publisher(
             PoseStamped, "/competition/rival/state", 10)
-        self.ownship_state_pub = self.create_publisher(
-            PoseStamped, "/competition/ownship/state", 10)
+        self.ownship_state_pub = None
+        if self.fixture_mode:
+            self.ownship_state_pub = self.create_publisher(
+                PoseStamped, "/competition/ownship/state", 10)
         
         self.session_token = None
         self.server_time = None
@@ -76,9 +78,6 @@ class CompetitionClient(Node):
         self.latest_ownship_pose = msg
 
     def authenticate(self):
-        if self.fixture_mode:
-            self.get_logger().info("fixture mode: skipping authentication")
-            return
         url = f"{self.ref_base_url}/login"
         try:
             response = requests.post(url, json=FIXTURE_CREDENTIALS, timeout=5)
@@ -92,9 +91,6 @@ class CompetitionClient(Node):
             self.get_logger().error(f"auth error: {e}")
 
     def fetch_server_time(self):
-        if self.fixture_mode:
-            self.get_logger().info("fixture mode: skipping server time fetch")
-            return
         url = f"{self.ref_base_url}/time"
         try:
             response = requests.get(url, timeout=5)
@@ -140,16 +136,6 @@ class CompetitionClient(Node):
                 self.get_logger().warn("no ownship telemetry available, skipping")
             return None
         
-        if self.fixture_mode:
-            import time
-            return {
-                "aircraft_id": "plane_02",
-                "position": {"x": 50.0, "y": 100.0, "z": 50.0},
-                "velocity": {"x": 0.0, "y": 0.0, "z": 0.0},
-                "heading": 90.0,
-                "timestamp": int(time.time() * 1000),
-            }
-        
         if not self.session_token:
             self.get_logger().warn("no session token, skipping telemetry")
             return None
@@ -193,9 +179,12 @@ class CompetitionClient(Node):
         self.rival_state_pub.publish(msg)
 
     def publish_ownship_state(self):
+        if not self.fixture_mode or self.ownship_state_pub is None:
+            return
+
         if self.latest_ownship_pose is not None:
             self.ownship_state_pub.publish(self.latest_ownship_pose)
-        elif self.fixture_mode:
+        else:
             msg = PoseStamped()
             msg.header = Header()
             msg.header.stamp = self.get_clock().now().to_msg()

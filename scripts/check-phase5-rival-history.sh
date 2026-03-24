@@ -2,106 +2,88 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REF_HOST="${REF_HOST:-localhost}"
-REF_PORT="${REFEREE_SERVER_PORT:-45678}"
-BASE_URL="http://${REF_HOST}:${REF_PORT}"
-
-echo "iconom phase-5 rival history buffer check"
-echo "target: ${BASE_URL}"
-echo
 
 cleanup() {
-    if [[ -n "${SERVER_PID:-}" ]]; then
-        kill "${SERVER_PID}" 2>/dev/null || true
-    fi
+    cd "${ROOT_DIR}"
+    docker compose --profile phase5 --env-file .env.example down --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
-start_referee_server() {
-    python3 "${ROOT_DIR}/sim/referee_server/referee_server.py" &
-    SERVER_PID=$!
-    sleep 1
-    echo "started referee server (PID: ${SERVER_PID})"
-}
+echo "iconom phase-5 rival history buffer check"
+echo
 
-wait_for_referee() {
-    local max_attempts=10
-    local attempt=1
-    while [[ ${attempt} -le ${max_attempts} ]]; do
-        if curl -s "${BASE_URL}/health" > /dev/null 2>&1; then
-            echo "referee server is ready"
-            return 0
-        fi
-        echo "waiting for referee server... (${attempt}/${max_attempts})"
-        sleep 1
-        ((attempt++))
-    done
-    echo "ERROR: referee server failed to start"
-    return 1
-}
+echo "================================================================"
+echo "building iconom_competition package"
+echo "================================================================"
+cd "${ROOT_DIR}"
+docker compose --env-file .env.example build ros2_app
 
-test_rival_history() {
-    echo "================================================================"
-    echo "testing rival history via HTTP API"
-    echo "================================================================"
-    
-    python3 -c "
-import requests
-import json
-import time
+echo "================================================================"
+echo "running real rival_buffer ROS path"
+echo "================================================================"
+docker compose --env-file .env.example run --rm ros2_app bash -c '
+    set -euo pipefail
+    cd /workspaces/ros2_ws
+    rm -rf build install log
+    colcon build --packages-select px4_msgs iconom_competition --merge-install
 
-base_url = '${BASE_URL}'
+    set +u
+    source install/setup.bash
+    set -u
 
-# authenticate
-resp = requests.post(f'{base_url}/login', json={'username': 'test_pilot', 'password': 'test_pass_123'})
-assert resp.status_code == 200, f'login failed: {resp.status_code}'
-print('PASS: authenticated with referee')
+    /workspaces/ros2_ws/install/bin/rival_buffer > /tmp/iconom-phase5-rival-buffer.log 2>&1 &
+    BUFFER_PID=$!
 
-# send multiple telemetry requests to accumulate history
-rival_ids_seen = set()
-positions_sent = []
-
-for i in range(5):
-    telemetry_payload = {
-        'aircraft_id': 'plane_01',
-        'position': {'x': 10.0 + i * 5, 'y': 20.0 + i * 3, 'z': 50.0 + i},
-        'velocity': {'x': 15.0, 'y': 5.0, 'z': 0.0},
-        'heading': 45.0 + i * 10,
+    cleanup_buffer() {
+        kill ${BUFFER_PID} 2>/dev/null || true
+        wait ${BUFFER_PID} 2>/dev/null || true
     }
-    resp = requests.post(f'{base_url}/telemetry', json=telemetry_payload)
-    assert resp.status_code == 200, f'telemetry failed: {resp.status_code}'
-    data = resp.json()
-    
-    rival = data.get('rival_state', {})
-    rival_id = rival.get('aircraft_id')
-    rival_ids_seen.add(rival_id)
-    
-    positions_sent.append(rival.get('position'))
-    
-    print(f'  sent telemetry {i+1}, received rival: {rival_id} at {rival.get(\"position\")}')
-    time.sleep(0.2)
+    trap cleanup_buffer EXIT
 
-print(f'PASS: received {len(rival_ids_seen)} unique rival identities: {rival_ids_seen}')
+    sleep 2
 
-# verify rival state includes timestamp information
-assert len(positions_sent) == 5, 'should have 5 position samples'
-print(f'PASS: stored {len(positions_sent)} rival snapshots')
+    ros2 topic pub --once /competition/rival/state geometry_msgs/msg/PoseStamped "{
+      header: {frame_id: plane_02},
+      pose: {
+        position: {x: 10.0, y: 20.0, z: 30.0},
+        orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      }
+    }" >/tmp/iconom-phase5-rival-history-pub-1.log 2>&1
+    sleep 0.5
+    ros2 topic pub --once /competition/rival/state geometry_msgs/msg/PoseStamped "{
+      header: {frame_id: plane_02},
+      pose: {
+        position: {x: 11.0, y: 22.0, z: 30.0},
+        orientation: {x: 0.0, y: 0.0, z: 0.1, w: 0.99}
+      }
+    }" >/tmp/iconom-phase5-rival-history-pub-2.log 2>&1
+    sleep 0.5
+    ros2 topic pub --once /competition/rival/state geometry_msgs/msg/PoseStamped "{
+      header: {frame_id: plane_02},
+      pose: {
+        position: {x: 12.0, y: 24.0, z: 30.0},
+        orientation: {x: 0.0, y: 0.0, z: 0.2, w: 0.98}
+      }
+    }" >/tmp/iconom-phase5-rival-history-pub-3.log 2>&1
 
-# verify timestamp is present in response
-resp = requests.post(f'{base_url}/telemetry', json={'aircraft_id': 'plane_01', 'position': {'x': 0, 'y': 0, 'z': 0}})
-data = resp.json()
-rival = data.get('rival_state', {})
-assert 'timestamp' in rival, 'rival state should include timestamp'
-print(f'PASS: rival state includes timestamp: {rival.get(\"timestamp\")}')
+    sleep 2
+    timeout 20 ros2 topic echo --once /rival_buffer/history > /tmp/iconom-phase5-rival-history.log
 
-print()
-print('All rival history checks passed!')
-"
-}
+    grep -q "frame_id: plane_02" /tmp/iconom-phase5-rival-history.log
+    echo "PASS: rival_buffer published history for the injected rival id"
 
-start_referee_server
-wait_for_referee
-test_rival_history
+    POSITION_COUNT=$(grep -c "position:" /tmp/iconom-phase5-rival-history.log || true)
+    if [[ ${POSITION_COUNT} -lt 3 ]]; then
+        echo "FAIL: rival history output did not contain the expected buffered poses"
+        cat /tmp/iconom-phase5-rival-history.log
+        exit 1
+    fi
+
+    grep -q "x: 10.0" /tmp/iconom-phase5-rival-history.log
+    grep -q "x: 11.0" /tmp/iconom-phase5-rival-history.log
+    grep -q "x: 12.0" /tmp/iconom-phase5-rival-history.log
+    echo "PASS: rival_buffer retained multiple injected rival samples"
+'
 
 echo
 echo "phase-5 rival history check passed"

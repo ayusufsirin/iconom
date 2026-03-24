@@ -263,7 +263,6 @@ The phase-5 competition client implementation is in [ros2_ws/src/iconom_competit
 - requests server time
 - sends telemetry packets to the referee
 - publishes parsed rival state to `/competition/rival/state`
-- publishes ownship state to `/competition/ownship/state`
 
 By default, the competition client expects live ownship telemetry from the ownship telemetry adapter. To run in fixture-only mode (for testing without the full PX4 stack), set `COMPETITION_FIXTURE_MODE=true`.
 
@@ -273,19 +272,22 @@ To run the competition client check:
 ./scripts/check-phase5-competition-client.sh
 ```
 
+The maintained check now starts the compose-backed `referee_server`, launches the real `competition_client` with fixture mode disabled, injects one ownship pose on `/competition/ownship/state`, and requires referee-backed rival-state output before it passes.
+
 The phase-5 ownship telemetry adapter is in [ros2_ws/src/iconom_competition/iconom_competition/ownship_telemetry_adapter.py](./ros2_ws/src/iconom_competition/iconom_competition/ownship_telemetry_adapter.py). It provides a ROS 2 node that:
 
-- subscribes to `/plane_01/fmu/out/vehicle_local_position` for live PX4 state
+- subscribes to `/${aircraft_id}/fmu/out/vehicle_local_position` for live PX4 state (`plane_01` by default)
 - maps the live position and velocity to competition telemetry format
 - authenticates with the mock referee server
 - sends telemetry packets at 1-second intervals
-- publishes ownship state to `/competition/ownship/state`
 
 To run the telemetry adapter check:
 
 ```bash
 ./scripts/check-phase5-telemetry-adapter.sh
 ```
+
+The maintained check now starts the compose-backed `referee_server`, launches the real `ownship_telemetry_adapter`, injects one PX4-shaped `VehicleLocalPosition`, and requires both `/competition/ownship/state` output and a real referee-backed telemetry exchange before it passes.
 
 The phase-5 rival history buffer is in [ros2_ws/src/iconom_competition/iconom_competition/rival_buffer.py](./ros2_ws/src/iconom_competition/iconom_competition/rival_buffer.py). It provides a ROS 2 node that:
 
@@ -300,10 +302,12 @@ To run the rival history buffer check:
 ./scripts/check-phase5-rival-history.sh
 ```
 
+The maintained check now launches the real `rival_buffer`, injects multiple rival `PoseStamped` samples on `/competition/rival/state`, and requires buffered `PoseArray` output on `/rival_buffer/history` before it passes.
+
 The phase-5 predictor is in [ros2_ws/src/iconom_competition/iconom_competition/predictor.py](./ros2_ws/src/iconom_competition/iconom_competition/predictor.py). It provides a ROS 2 node that:
 
-- subscribes to `/rival_buffer/history` (PoseArray) for buffered rival history from rival_buffer
-- uses buffered history to estimate rival velocity
+- subscribes to `/competition/rival/state` for rival state updates
+- maintains an internal rolling history buffer for prediction
 - publishes predicted rival position to `/competition/prediction/rival_position`
 - uses a configurable prediction horizon (default 2 seconds)
 
@@ -313,6 +317,8 @@ To run the predictor check:
 ./scripts/check-phase5-predictor.sh
 ```
 
+The maintained check now launches the real `predictor`, injects multiple rival-state samples, and requires a prediction on `/competition/prediction/rival_position` that advances beyond the last injected sample before it passes.
+
 ## Phase 5 Daily Use
 
 The maintained phase-5 acceptance entrypoint is [phase5-acceptance.sh](./scripts/phase5-acceptance.sh). It runs all phase-5 checks in sequence:
@@ -320,3 +326,5 @@ The maintained phase-5 acceptance entrypoint is [phase5-acceptance.sh](./scripts
 ```bash
 ./scripts/phase5-acceptance.sh --headless
 ```
+
+The repaired headless acceptance path now passes through the real referee, competition client, telemetry adapter, rival buffer, and predictor checks instead of the earlier fixture-only shortcuts.

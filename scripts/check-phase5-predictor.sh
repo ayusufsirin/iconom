@@ -2,87 +2,69 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REF_HOST="${REF_HOST:-localhost}"
-REF_PORT="${REFEREE_SERVER_PORT:-45678}"
-BASE_URL="http://${REF_HOST}:${REF_PORT}"
 
 echo "iconom phase-5 predictor check"
-echo "target: ${BASE_URL}"
 echo
 
-cleanup() {
-    if [[ -n "${SERVER_PID:-}" ]]; then
-        kill "${SERVER_PID}" 2>/dev/null || true
-    fi
-}
-trap cleanup EXIT
+echo "================================================================"
+echo "building iconom_competition package"
+echo "================================================================"
+cd "${ROOT_DIR}"
+docker compose --env-file .env.example build ros2_app
 
-start_referee_server() {
-    python3 "${ROOT_DIR}/sim/referee_server/referee_server.py" &
-    SERVER_PID=$!
+echo "================================================================"
+echo "running real predictor ROS path"
+echo "================================================================"
+docker compose --env-file .env.example run --rm ros2_app bash -c '
+    set -euo pipefail
+    cd /workspaces/ros2_ws
+    rm -rf build install log
+    colcon build --packages-select px4_msgs iconom_competition --merge-install
+
+    set +u
+    source install/setup.bash
+    set -u
+
+    /workspaces/ros2_ws/install/bin/predictor > /tmp/iconom-phase5-predictor.log 2>&1 &
+    PREDICTOR_PID=$!
+
+    cleanup_predictor() {
+        kill ${PREDICTOR_PID} 2>/dev/null || true
+        wait ${PREDICTOR_PID} 2>/dev/null || true
+    }
+    trap cleanup_predictor EXIT
+
+    sleep 2
+
+    ros2 topic pub --once /competition/rival/state geometry_msgs/msg/PoseStamped "{
+      header: {frame_id: plane_02},
+      pose: {
+        position: {x: 0.0, y: 0.0, z: 30.0},
+        orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      }
+    }" >/tmp/iconom-phase5-predictor-pub-1.log 2>&1
     sleep 1
-    echo "started referee server (PID: ${SERVER_PID})"
-}
+    ros2 topic pub --once /competition/rival/state geometry_msgs/msg/PoseStamped "{
+      header: {frame_id: plane_02},
+      pose: {
+        position: {x: 10.0, y: 0.0, z: 30.0},
+        orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      }
+    }" >/tmp/iconom-phase5-predictor-pub-2.log 2>&1
+    sleep 1
+    ros2 topic pub --once /competition/rival/state geometry_msgs/msg/PoseStamped "{
+      header: {frame_id: plane_02},
+      pose: {
+        position: {x: 20.0, y: 0.0, z: 30.0},
+        orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      }
+    }" >/tmp/iconom-phase5-predictor-pub-3.log 2>&1
 
-wait_for_referee() {
-    local max_attempts=10
-    local attempt=1
-    while [[ ${attempt} -le ${max_attempts} ]]; do
-        if curl -s "${BASE_URL}/health" > /dev/null 2>&1; then
-            echo "referee server is ready"
-            return 0
-        fi
-        echo "waiting for referee server... (${attempt}/${max_attempts})"
-        sleep 1
-        ((attempt++))
-    done
-    echo "ERROR: referee server failed to start"
-    return 1
-}
+    sleep 2
+    timeout 20 ros2 topic echo --once /competition/prediction/rival_position > /tmp/iconom-phase5-prediction.log
 
-test_predictor_ros() {
-    echo "================================================================"
-    echo "testing predictor ROS pipeline (direct subscription to rival state)"
-    echo "================================================================"
-    
-    docker compose -f "${ROOT_DIR}/docker-compose.yml" run --rm ros2_app bash -c '
-        set +u
-        cd /workspaces/ros2_ws
-        source install/setup.bash
-        set -u
-        
-        export REF_HOST=host.docker.internal
-        export REF_PORT=45678
-        export COMPETITION_FIXTURE_MODE=true
-        
-        /workspaces/ros2_ws/install/bin/competition_client &
-        CLIENT_PID=$!
-        
-        sleep 3
-        
-        /workspaces/ros2_ws/install/bin/predictor &
-        PREDICTOR_PID=$!
-        
-        sleep 3
-        
-        FAIL=0
-        ros2 topic list | grep -q "/competition/rival/state" || { echo "FAIL: /competition/rival/state not found"; FAIL=1; }
-        ros2 topic list | grep -q "/competition/prediction/rival_position" || { echo "FAIL: /competition/prediction/rival_position not found"; FAIL=1; }
-        
-        if [ $FAIL -eq 0 ]; then
-            echo "PASS: /competition/rival/state exists"
-            echo "PASS: /competition/prediction/rival_position exists"
-            echo "PASS: predictor subscribes directly to rival state and publishes predictions"
-        fi
-        
-        kill $CLIENT_PID $PREDICTOR_PID 2>/dev/null || true
-        exit $FAIL
-    '
-}
-
-start_referee_server
-wait_for_referee
-test_predictor_ros
+    python3 -c "from pathlib import Path; import re; pred = Path(\"/tmp/iconom-phase5-prediction.log\").read_text(); pred_match = re.search(r\"\\n\\s*x:\\s*([-0-9.]+)\", pred); assert \"frame_id: plane_02\" in pred, \"FAIL: prediction frame_id was not plane_02\"; assert pred_match, \"FAIL: predicted x position not found\"; pred_x = float(pred_match.group(1)); assert pred_x > 20.0, f\"FAIL: predicted x position {pred_x} did not advance beyond the last injected sample 20.0\"; print(\"PASS: predictor published a rival prediction for plane_02\"); print(f\"PASS: predicted x position advanced beyond the last injected sample: {pred_x} > 20.0\")"
+'
 
 echo
 echo "phase-5 predictor check passed"

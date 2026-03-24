@@ -17,8 +17,6 @@ REF_PORT = int(os.environ.get("REF_PORT", "45678"))
 REF_BASE_URL = f"http://{REF_HOST}:{REF_PORT}"
 
 AIRCRAFT_ID = os.environ.get("AIRCRAFT_ID", "plane_01")
-LOCAL_POSITION_TOPIC = f"/{AIRCRAFT_ID}/fmu/out/vehicle_local_position"
-
 TELEMETRY_INTERVAL = 1.0
 
 
@@ -35,6 +33,8 @@ class OwnshipTelemetryAdapter(Node):
         self.ref_base_url = f"http://{self.ref_host}:{self.ref_port}"
         self.aircraft_id = self.get_parameter("aircraft_id").value
         
+        self.local_position_topic = f"/{self.aircraft_id}/fmu/out/vehicle_local_position"
+
         self.ownship_state_pub = self.create_publisher(
             PoseStamped, "/competition/ownship/state", 10)
         
@@ -43,7 +43,7 @@ class OwnshipTelemetryAdapter(Node):
         self.session_token = None
         
         self.get_logger().info(f"ownship telemetry adapter starting, aircraft: {self.aircraft_id}")
-        self.get_logger().info(f"subscribing to {LOCAL_POSITION_TOPIC}, referee at {self.ref_base_url}")
+        self.get_logger().info(f"subscribing to {self.local_position_topic}, referee at {self.ref_base_url}")
         
         from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
         qos = QoSProfile(
@@ -53,7 +53,7 @@ class OwnshipTelemetryAdapter(Node):
         )
         self.position_sub = self.create_subscription(
             VehicleLocalPosition,
-            LOCAL_POSITION_TOPIC,
+            self.local_position_topic,
             self._handle_position,
             qos,
         )
