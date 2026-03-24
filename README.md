@@ -334,3 +334,15 @@ The repaired headless acceptance path now passes through the real referee, compe
 The source-of-truth planning document for the next phase is [docs/phase-6-plan.md](./docs/phase-6-plan.md).
 
 Phase 6 is intentionally narrower than a full fighter round. It starts with deterministic target selection, then adds bounded intercept planning, one pursuit state machine, and one maintained camera-cueing proof before any visual lock logic.
+
+## Phase 6 Target Selection
+
+The first phase-6 slice is the deterministic target selector in [ros2_ws/src/iconom_guidance](./ros2_ws/src/iconom_guidance). It consumes maintained ownship and rival `PoseStamped` topics, chooses the nearest rival deterministically, and publishes the current selection on `/guidance/selected_target`.
+
+To run the target-selection check:
+
+```bash
+./scripts/check-phase6-target-selection.sh
+```
+
+The maintained check launches the real selector, injects controlled ownship and rival states, and requires deterministic selection plus reselection before it passes.
