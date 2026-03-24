@@ -269,3 +269,17 @@ To run the competition client check:
 ```bash
 ./scripts/check-phase5-competition-client.sh
 ```
+
+The phase-5 ownship telemetry adapter is in [ros2_ws/src/iconom_competition/iconom_competition/ownship_telemetry_adapter.py](./ros2_ws/src/iconom_competition/iconom_competition/ownship_telemetry_adapter.py). It provides a ROS 2 node that:
+
+- subscribes to `/plane_01/fmu/out/vehicle_local_position` for live PX4 state
+- maps the live position and velocity to competition telemetry format
+- authenticates with the mock referee server
+- sends telemetry packets at 1-second intervals
+- publishes ownship state to `/competition/ownship/state`
+
+To run the telemetry adapter check:
+
+```bash
+./scripts/check-phase5-telemetry-adapter.sh
+```
