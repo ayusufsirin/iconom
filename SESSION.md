@@ -1,25 +1,37 @@
 # SESSION
 
 ## Goal
-Phase 5.2 final cleanup — resolve the last phase-5 architecture mismatch and make acceptance prove the intended rival-buffer path.
+Phase 5.3 architecture closure — force a single final phase-5 history/prediction architecture and remove the alternative path.
+
+## Architecture Decision
+**Option A — Buffer-centered architecture** is the official maintained design:
+
+- rival_buffer is the only maintained owner of buffered rival history
+- predictor consumes rival_buffer's `/rival_buffer/history` topic output
+- predictor does NOT maintain a competing long-lived raw-rival-state history path
+- raw rival-state subscription exists ONLY inside rival_buffer
 
 ## Current status
-Phase 5 is complete. The mock referee server, competition client, ownship telemetry adapter, rival history buffer, and predictor are all implemented and aligned with the architecture.
+Phase 5 is complete with a single, unambiguous architecture. The mock referee server, competition client, ownship telemetry adapter, rival history buffer, and predictor are all implemented and aligned with the official buffer-centered architecture.
 
 ## Files touched
-- `ros2_ws/src/iconom_competition/iconom_competition/predictor.py` - updated to consume from rival buffer's history topic instead of directly subscribing to rival state
+- `docs/phase-5-plan.md` - updated predictor contract to consume from rival_buffer
+- `README.md` - updated predictor description to match buffer-centered architecture
 
 ## Last completed step
-Phase 5.2 final cleanup complete:
-1. Fixed predictor to subscribe to `/rival_buffer/history` (PoseArray) instead of `/competition/rival/state` (PoseStamped)
-2. This makes the predictor consume the rival buffer's buffered history as the source of truth
-3. All acceptance tests pass
+Phase 5.3 architecture closure complete:
+1. Chose Option A (buffer-centered architecture) as the single official design
+2. Updated docs/phase-5-plan.md to reflect predictor consuming from `/rival_buffer/history`
+3. Updated README.md to match the implemented architecture
+4. Verified predictor.py correctly subscribes to `/rival_buffer/history` (PoseArray)
+5. Verified rival_buffer.py is the only component subscribing to raw `/competition/rival/state`
+6. All acceptance tests pass
 
 ## Current blocker
 None
 
 ## Next exact step
-Phase 6 is now ready to start. The phase-5 stack is internally coherent with the documented architecture.
+Phase 6 is now ready to start. The phase-5 stack has exactly one truthful source of rival history for prediction.
 
 ## Validation
 - `cd /home/joseph/Projects/iconom && ./scripts/phase5-acceptance.sh --headless`
@@ -29,4 +41,5 @@ Phase 6 is now ready to start. The phase-5 stack is internally coherent with the
 - Phase 5 remains simulation-only with no hardware, reporting, or vision lock logic.
 - Competition client default behavior: subscribes to `/competition/ownship/state` for live telemetry
 - Competition client fixture mode: set `COMPETITION_FIXTURE_MODE=true` for testing without full PX4 stack
-- Predictor consumes rival buffer history: subscribes to `/rival_buffer/history` topic
+- Predictor official input: `/rival_buffer/history` (PoseArray from rival_buffer)
+- Rival buffer official input: `/competition/rival/state` (PoseStamped from competition_client)

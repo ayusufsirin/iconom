@@ -302,8 +302,8 @@ To run the rival history buffer check:
 
 The phase-5 predictor is in [ros2_ws/src/iconom_competition/iconom_competition/predictor.py](./ros2_ws/src/iconom_competition/iconom_competition/predictor.py). It provides a ROS 2 node that:
 
-- subscribes to `/competition/rival/state` for rival state updates
-- maintains a rolling buffer to estimate rival velocity
+- subscribes to `/rival_buffer/history` (PoseArray) for buffered rival history from rival_buffer
+- uses buffered history to estimate rival velocity
 - publishes predicted rival position to `/competition/prediction/rival_position`
 - uses a configurable prediction horizon (default 2 seconds)
 

@@ -137,8 +137,8 @@ Recommended:
 
 The predictor computes bounded trajectory predictions from rival history:
 
-- subscribes directly to `/competition/rival/state` for real-time updates
-- maintains its own rolling history buffer for velocity estimation
+- subscribes to rival_buffer's history output topic (`/rival_buffer/history`)
+- uses buffered history from rival_buffer to estimate velocity
 - computes linear extrapolation prediction of future rival position
 - publishes predicted rival position to a topic for consumption
 
@@ -146,7 +146,7 @@ Recommended:
 
 - package name: `iconom_predictor`
 - predictor script: `predictor.py`
-- input topic: `/competition/rival/state`
+- input topic: `/rival_buffer/history` (PoseArray from rival_buffer)
 - output topic: `/competition/prediction/rival_position`
 - prediction horizon: configurable, default 2 seconds
 
@@ -154,14 +154,15 @@ Recommended:
 
 All phase-5 topics follow the `/competition/...` root:
 
-- `/referee/state` - raw referee broadcasts
-- `/competition/rival/state` - parsed rival state from referee
-- `/competition/ownship/state` - local aircraft state for referee
-- `/competition/prediction/rival_position` - predicted rival trajectory
+- `/competition/rival/state` - parsed rival state from referee (published by competition_client)
+- `/competition/ownship/state` - local aircraft state for referee (published by ownship_telemetry_adapter or competition_client in fixture mode)
+- `/competition/prediction/rival_position` - predicted rival trajectory (published by predictor)
 
-All phase-5 services follow the `/rival_buffer/...` root:
+The `/rival_buffer/...` topics are the official source of buffered history:
 
-- `/rival_buffer/get_history` - retrieve stored rival history
+- `/rival_buffer/history` - buffered rival history as PoseArray (published by rival_buffer)
+
+Note: `/referee/state` is internal to the referee server's HTTP API and not a ROS topic.
 
 ## Implementation Order
 
