@@ -346,3 +346,15 @@ To run the target-selection check:
 ```
 
 The maintained check launches the real selector, injects controlled ownship and rival states, and requires deterministic selection plus reselection before it passes.
+
+## Phase 6 Intercept Planner
+
+The second phase-6 slice is the bounded intercept planner in [ros2_ws/src/iconom_guidance](./ros2_ws/src/iconom_guidance). It consumes ownship state, the selected rival, and the predicted rival position, then publishes a bounded intercept target on `/guidance/intercept_target`.
+
+To run the intercept-planner check:
+
+```bash
+./scripts/check-phase6-intercept-planner.sh
+```
+
+The maintained check launches the real planner, injects controlled ownship and predicted-target inputs, and requires both clamp-to-bound behavior and in-bounds passthrough behavior before it passes.

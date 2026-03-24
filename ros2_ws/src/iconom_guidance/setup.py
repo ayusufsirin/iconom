@@ -19,6 +19,7 @@ setup(
     entry_points={
         "console_scripts": [
             "target_selector = iconom_guidance.target_selector:main",
+            "intercept_planner = iconom_guidance.intercept_planner:main",
         ],
     },
 )
