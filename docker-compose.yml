@@ -93,8 +93,8 @@ services:
     build:
       context: .
       dockerfile: docker/xrce_agent/Dockerfile
-    args:
-      XRCE_AGENT_VERSION: ${XRCE_AGENT_VERSION:-v2.4.3}
+      args:
+        XRCE_AGENT_VERSION: ${XRCE_AGENT_VERSION:-v2.4.3}
     environment:
       XRCE_AGENT_UDP_PORT: ${XRCE_AGENT_UDP_PORT:-8888}
     ports:

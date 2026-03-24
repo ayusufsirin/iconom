@@ -1,29 +1,31 @@
 # SESSION
 
 ## Goal
-Implement phase 5 slice 2 - the mock referee server baseline. The immediate engineering goal is a deterministic referee server with login, server time, and telemetry endpoints that can be verified headless.
+Implement phase 5 slice 3 - the ROS competition client baseline. The immediate engineering goal is a ROS 2 package that connects to the mock referee server and publishes rival/ownship state to ROS topics.
 
 ## Current status
-Phase 5 plan exists at `docs/phase-5-plan.md`. The mock referee server has been implemented with the required endpoints and acceptance script created.
+Phase 5 plan exists at `docs/phase-5-plan.md`. The mock referee server is complete. The competition client package is now implemented.
 
 ## Files touched
-- `sim/referee_server/referee_server.py`
-- `docker-compose.yml`
-- `scripts/check-phase5-referee-server.sh`
+- `ros2_ws/src/iconom_competition/package.xml`
+- `ros2_ws/src/iconom_competition/setup.py`
+- `ros2_ws/src/iconom_competition/iconom_competition/__init__.py`
+- `ros2_ws/src/iconom_competition/iconom_competition/competition_client.py`
+- `scripts/check-phase5-competition-client.sh`
 - `README.md`
 - `SESSION.md`
 
 ## Last completed step
-Implemented mock referee server with /health, /time, /login, and /telemetry endpoints, created acceptance script, updated docker-compose.yml with referee_server service, and documented in README.md.
+Implemented iconom_competition ROS package with competition_client.py that authenticates with referee server, fetches server time, sends telemetry, and publishes rival/ownship state to ROS topics.
 
 ## Current blocker
 None
 
 ## Next exact step
-Run `./scripts/check-phase5-referee-server.sh` to verify the referee server endpoints work correctly.
+Run `./scripts/check-phase5-competition-client.sh` to verify the competition client works correctly.
 
 ## Validation
-- `cd /home/joseph/Projects/iconom && ./scripts/check-phase5-referee-server.sh`
+- `cd /home/joseph/Projects/iconom && ./scripts/check-phase5-competition-client.sh`
 
 ## Notes
 - Keep `QGroundControl-x86_64.AppImage` and `opencode.json` out of commits.

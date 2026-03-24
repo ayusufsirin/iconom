@@ -255,3 +255,17 @@ Or via Docker:
 ```bash
 docker compose --profile phase5 up referee_server
 ```
+
+The phase-5 competition client implementation is in [ros2_ws/src/iconom_competition](./ros2_ws/src/iconom_competition). It provides a ROS 2 node that:
+
+- authenticates with the mock referee server
+- requests server time
+- sends fixture telemetry packets
+- publishes parsed rival state to `/competition/rival/state`
+- publishes ownship state to `/competition/ownship/state`
+
+To run the competition client check:
+
+```bash
+./scripts/check-phase5-competition-client.sh
+```
