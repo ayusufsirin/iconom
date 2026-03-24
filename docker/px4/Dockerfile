@@ -111,9 +111,10 @@ RUN bash ./Tools/setup/ubuntu.sh --no-sim-tools --no-nuttx \
  && make px4_sitl_default
 
 COPY docker/px4/entrypoint.sh /usr/local/bin/px4-entrypoint.sh
+COPY docker/px4/run-vehicle.sh /usr/local/bin/px4-run-vehicle.sh
 COPY docker/px4/run-single-vehicle.sh /usr/local/bin/px4-run-single-vehicle.sh
 
-RUN chmod +x /usr/local/bin/px4-entrypoint.sh /usr/local/bin/px4-run-single-vehicle.sh
+RUN chmod +x /usr/local/bin/px4-entrypoint.sh /usr/local/bin/px4-run-vehicle.sh /usr/local/bin/px4-run-single-vehicle.sh
 
 ENV PX4_HOME=/opt/PX4-Autopilot
 ENV PX4_GIT_REF=v1.16.0
@@ -128,6 +129,11 @@ ENV XRCE_AGENT_UDP_PORT=8888
 ENV MAVLINK_OFFBOARD_BASE_PORT=14540
 ENV MAVLINK_GCS_PORT=14550
 ENV PX4_SIM_MODEL=gz_rc_cessna
+ENV PX4_INSTANCE=0
+ENV PX4_GZ_MODEL_POSE=0,0,0
+ENV ICONOM_GZ_MODEL_NAME=rc_cessna_0
+ENV ICONOM_EXPECTED_MAV_SYS_ID=1
+ENV ICONOM_EXPECTED_MAVLINK_OFFBOARD_PORT=14540
 
 WORKDIR /opt/PX4-Autopilot
 
