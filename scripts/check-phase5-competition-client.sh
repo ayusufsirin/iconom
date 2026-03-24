@@ -61,6 +61,7 @@ build_and_run_competition_package() {
         set +u; source install/setup.bash; set -u
         export REF_HOST=host.docker.internal
         export REF_PORT=45678
+        export COMPETITION_FIXTURE_MODE=true
         /workspaces/ros2_ws/install/bin/competition_client &
         CLIENT_PID=$!
         CLIENT_PID=\$!
