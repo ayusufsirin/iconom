@@ -188,6 +188,17 @@ Success:
 - both aircraft remain visible in one Gazebo window,
 - both aircraft start at the rc_cessna model's native ground-contact height instead of visually clipping into it.
 
+### Slice 9: Dual Navigation Loop
+
+Prove that both aircraft can complete the bounded phase-3-style loop in one shared phase-4 runtime.
+
+Success:
+
+- `plane_01` completes `NAV_TAKEOFF` -> `mode_loiter` -> `NAV_LAND`,
+- `plane_02` remains unchanged during the `plane_01` loop,
+- `plane_02` then completes the same bounded loop in the same shared sim,
+- the maintained headless phase-4 acceptance path includes this proof.
+
 ## Acceptance Criteria
 
 Phase 4 is complete when all of the following are true:
@@ -217,7 +228,7 @@ Phase-4 completion should leave the repo with:
 - one maintained dual-aircraft acceptance script
 - one maintained dual-aircraft GUI bring-up path
 - updated documentation for the two-aircraft contract
-- isolated telemetry, camera, command, mode, and bounded nav proofs for both aircraft
+- isolated telemetry, camera, command, mode, bounded nav, and bounded dual-loop proofs for both aircraft
 
 The next likely increment after this closed phase-4 slice is the first bounded multi-vehicle coordination layer, not a larger uncontrolled expansion of vehicle count.
 

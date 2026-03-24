@@ -28,6 +28,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Phase 4 Command Isolation Check Script](./scripts/check-phase4-command-isolation.sh)
 - [Phase 4 Mode Isolation Check Script](./scripts/check-phase4-mode-isolation.sh)
 - [Phase 4 Nav Isolation Check Script](./scripts/check-phase4-nav-isolation.sh)
+- [Phase 4 Dual Nav Loop Check Script](./scripts/check-phase4-dual-nav-loop.sh)
 - [Phase 4 Acceptance Script](./scripts/phase4-acceptance.sh)
 - [PX4 Telemetry Check Script](./scripts/check-px4-telemetry.sh)
 - [Camera Bridge Check Script](./scripts/check-camera-bridge.sh)
@@ -207,3 +208,5 @@ The next phase-4 control proof is [check-phase4-nav-isolation.sh](./scripts/chec
 The maintained phase-4 entrypoint is [phase4-acceptance.sh](./scripts/phase4-acceptance.sh). It runs the current dual-aircraft contract, isolation, command-isolation, mode-isolation, and nav-isolation proofs in sequence.
 
 The maintained dual-aircraft GUI path is [bringup-phase4-gui.sh](./scripts/bringup-phase4-gui.sh). It keeps one Gazebo window open with `plane_01` and `plane_02` attached to the same world and uses explicit phase-4 spawn poses so both aircraft start at the rc_cessna model's native ground-contact height instead of visually clipping into it.
+
+The next phase-4 navigation proof is [check-phase4-dual-nav-loop.sh](./scripts/check-phase4-dual-nav-loop.sh). It keeps one shared dual-aircraft runtime, runs the bounded phase-3-style `NAV_TAKEOFF` -> `mode_loiter` -> `NAV_LAND` loop for `plane_01`, confirms `plane_02` stayed untouched, then runs the same loop for `plane_02` in the same sim.

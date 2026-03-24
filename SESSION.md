@@ -1,37 +1,34 @@
 # SESSION
 
 ## Goal
-Tighten the phase-4 dual-aircraft GUI baseline so both aircraft spawn cleanly and the maintained operator path matches the validated runtime shape.
+Finish the phase-4 dual-aircraft navigation-loop slice and leave it ready for commit. The immediate engineering goal is a truthful two-aircraft baseline where both planes can complete the bounded phase-3-style loop in one shared simulation.
 
 ## Current status
-The repo has a tagged single-aircraft guidance loop through landing, passing phase-4 runtime/isolation/command/mode/nav proofs, and a maintained `phase4-acceptance.sh` entrypoint that passes end to end. The active slice adds explicit phase-4 spawn-height control plus a maintained dual-aircraft GUI bring-up path.
+The new `check-phase4-dual-nav-loop.sh` slice is implemented but not committed. It passed on its own in headless mode, the packaged `./scripts/phase4-acceptance.sh --headless` flow passed, and the same dual-loop was confirmed in GUI mode with both aircraft completing takeoff, loiter, and landing in one shared sim.
 
 ## Files touched
-- `.env.example`
-- `docker-compose.yml`
-- `scripts/bringup-phase4-gui.sh`
+- `scripts/check-phase4-dual-nav-loop.sh`
+- `scripts/phase4-acceptance.sh`
 - `README.md`
 - `docs/phase-4-plan.md`
 - `SESSION.md`
+- `POLICY.md`
 
 ## Last completed step
-Added and validated the bounded dual-aircraft nav-isolation proof, then reran `./scripts/phase4-acceptance.sh --headless` successfully.
+Validated the new dual-aircraft navigation-loop slice headless and in GUI, then cleaned the phase-4 runtime back down.
 
 ## Current blocker
 None
 
 ## Next exact step
-Run `./scripts/phase4-acceptance.sh --headless`, then launch `./scripts/bringup-phase4-gui.sh` and visually confirm the adjusted spawn height for both aircraft.
+Commit the pending phase-4 dual-nav-loop slice with a conventional commit after approval.
 
 ## Validation
-```bash
-cd /home/joseph/Projects/iconom
-./scripts/phase4-acceptance.sh --headless
-./scripts/bringup-phase4-gui.sh
-```
+- `cd /home/joseph/Projects/iconom && ./scripts/check-phase4-dual-nav-loop.sh`
+- `cd /home/joseph/Projects/iconom && ./scripts/phase4-acceptance.sh --headless`
+- `cd /home/joseph/Projects/iconom && xhost +local:docker && ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase4-dual-nav-loop.sh`
 
 ## Notes
-- Phase 4 is still limited to dual-aircraft coexistence and isolation, not swarm coordination.
-- `px4_plane_02` and `ros_gz_bridge_plane_02` stay profile-gated behind `phase4` so single-aircraft flows remain unchanged.
-- Phase-4 GUI uses explicit `PLANE_01_PX4_GZ_MODEL_POSE` and `PLANE_02_PX4_GZ_MODEL_POSE` values from `.env.example`.
-- Keep local `.env`, `QGroundControl-x86_64.AppImage`, `opencode.json`, and ROS build/install/log outputs untracked.
+- `phase4-acceptance.sh` now includes the dual-nav-loop slice.
+- Keep `QGroundControl-x86_64.AppImage` and `opencode.json` out of commits.
+- The GUI run was cleaned down after validation; no phase-4 containers should be left running.

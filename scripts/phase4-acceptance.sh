@@ -8,7 +8,7 @@ RUN_RUNTIME_CONTRACT="${ICONOM_PHASE4_RUN_RUNTIME_CONTRACT:-1}"
 declare -a CHECKS=()
 
 usage() {
-  cat <<'EOF'
+  cat <<'USAGE'
 Usage: phase4-acceptance.sh [--headless] [--skip-runtime-contract]
 
 Run the current phase-4 acceptance flow against the maintained dual-aircraft stack.
@@ -16,7 +16,7 @@ Run the current phase-4 acceptance flow against the maintained dual-aircraft sta
 Environment:
   ICONOM_PHASE4_MODE=headless
   ICONOM_PHASE4_RUN_RUNTIME_CONTRACT=0|1
-EOF
+USAGE
 }
 
 while [[ $# -gt 0 ]]; do
@@ -61,6 +61,7 @@ CHECKS+=(
   "${ROOT_DIR}/scripts/check-phase4-command-isolation.sh"
   "${ROOT_DIR}/scripts/check-phase4-mode-isolation.sh"
   "${ROOT_DIR}/scripts/check-phase4-nav-isolation.sh"
+  "${ROOT_DIR}/scripts/check-phase4-dual-nav-loop.sh"
 )
 
 echo "iconom phase-4 acceptance"
