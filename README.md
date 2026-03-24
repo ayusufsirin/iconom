@@ -19,6 +19,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Single-Vehicle Integration Script](./scripts/integration-single-vehicle.sh)
 - [Single-Vehicle Bring-Up Script](./scripts/bringup-single-vehicle.sh)
 - [Single-Vehicle GUI Bring-Up Script](./scripts/bringup-single-vehicle-gui.sh)
+- [Phase 4 GUI Bring-Up Script](./scripts/bringup-phase4-gui.sh)
 - [Phase 1 Launch Script](./scripts/phase1-launch.sh)
 - [Phase 1 Acceptance Script](./scripts/phase1-acceptance.sh)
 - [Phase 3 Acceptance Script](./scripts/phase3-acceptance.sh)
@@ -204,3 +205,5 @@ The next phase-4 control proof is [check-phase4-mode-isolation.sh](./scripts/che
 The next phase-4 control proof is [check-phase4-nav-isolation.sh](./scripts/check-phase4-nav-isolation.sh). It keeps `plane_02` disarmed, runs the bounded `NAV_TAKEOFF` -> `mode_loiter` -> `DO_REPOSITION` chain on `plane_01`, and verifies that the repositioned aircraft moves toward its commanded target without mutating `plane_02`.
 
 The maintained phase-4 entrypoint is [phase4-acceptance.sh](./scripts/phase4-acceptance.sh). It runs the current dual-aircraft contract, isolation, command-isolation, mode-isolation, and nav-isolation proofs in sequence.
+
+The maintained dual-aircraft GUI path is [bringup-phase4-gui.sh](./scripts/bringup-phase4-gui.sh). It keeps one Gazebo window open with `plane_01` and `plane_02` attached to the same world and uses explicit phase-4 spawn poses so both aircraft start at the rc_cessna model's native ground-contact height instead of visually clipping into it.

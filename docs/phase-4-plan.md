@@ -178,6 +178,16 @@ Success:
 - the same coexistence can be observed in GUI mode,
 - the work still avoids swarm coordination logic.
 
+### Slice 8: GUI Ground-Contact Cleanup
+
+Tighten the maintained dual-aircraft GUI path so both aircraft sit cleanly at startup.
+
+Success:
+
+- the phase-4 GUI path uses explicit per-aircraft spawn poses,
+- both aircraft remain visible in one Gazebo window,
+- both aircraft start at the rc_cessna model's native ground-contact height instead of visually clipping into it.
+
 ## Acceptance Criteria
 
 Phase 4 is complete when all of the following are true:
@@ -205,6 +215,7 @@ Phase-4 completion should leave the repo with:
 
 - one maintained dual-aircraft runtime path
 - one maintained dual-aircraft acceptance script
+- one maintained dual-aircraft GUI bring-up path
 - updated documentation for the two-aircraft contract
 - isolated telemetry, camera, command, mode, and bounded nav proofs for both aircraft
 
