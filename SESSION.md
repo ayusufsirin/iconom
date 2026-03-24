@@ -1,30 +1,29 @@
 # SESSION
 
 ## Goal
-Start phase 5 from the tagged phase-4 dual-aircraft baseline. The immediate engineering goal is to implement the server-aware two-aircraft substrate with mock referee, competition client, ownship adapter, rival buffer, and predictor without breaking the existing isolation and acceptance guarantees.
+Implement phase 5 slice 2 - the mock referee server baseline. The immediate engineering goal is a deterministic referee server with login, server time, and telemetry endpoints that can be verified headless.
 
 ## Current status
-Phase 4 is complete and tagged at `phase4-dual-aircraft-baseline` on commit `747eae3`. The repo now has maintained dual-aircraft runtime, isolation, command/mode/nav proofs, GUI bring-up, a bounded two-aircraft nav loop, and a passing `./scripts/phase4-acceptance.sh --headless` entrypoint.
-
-Phase 5 plan exists at `docs/phase-5-plan.md` defining the mock referee server, competition client, ownship telemetry adapter, rival history buffer, predictor, and acceptance path.
+Phase 5 plan exists at `docs/phase-5-plan.md`. The mock referee server has been implemented with the required endpoints and acceptance script created.
 
 ## Files touched
-- `SESSION.md`
-- `docs/phase-5-plan.md`
+- `sim/referee_server/referee_server.py`
+- `docker-compose.yml`
+- `scripts/check-phase5-referee-server.sh`
 - `README.md`
+- `SESSION.md`
 
 ## Last completed step
-Created phase-5 plan document and updated README.md to reference phase 5.
+Implemented mock referee server with /health, /time, /login, and /telemetry endpoints, created acceptance script, updated docker-compose.yml with referee_server service, and documented in README.md.
 
 ## Current blocker
 None
 
 ## Next exact step
-Implement the mock referee server (slice 1 of phase-5) with defined message format and wire protocol.
+Run `./scripts/check-phase5-referee-server.sh` to verify the referee server endpoints work correctly.
 
 ## Validation
-- `cd /home/joseph/Projects/iconom && git tag --list`
-- `cd /home/joseph/Projects/iconom && ./scripts/phase4-acceptance.sh --headless`
+- `cd /home/joseph/Projects/iconom && ./scripts/check-phase5-referee-server.sh`
 
 ## Notes
 - Keep `QGroundControl-x86_64.AppImage` and `opencode.json` out of commits.

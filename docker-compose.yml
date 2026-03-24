@@ -93,12 +93,23 @@ services:
     build:
       context: .
       dockerfile: docker/xrce_agent/Dockerfile
-      args:
-        XRCE_AGENT_VERSION: ${XRCE_AGENT_VERSION:-v2.4.3}
+    args:
+      XRCE_AGENT_VERSION: ${XRCE_AGENT_VERSION:-v2.4.3}
     environment:
       XRCE_AGENT_UDP_PORT: ${XRCE_AGENT_UDP_PORT:-8888}
     ports:
       - "${XRCE_AGENT_UDP_PORT:-8888}:${XRCE_AGENT_UDP_PORT:-8888}/udp"
+    restart: "no"
+
+  referee_server:
+    profiles: ["phase5"]
+    image: python:3.11-slim
+    ports:
+      - "${REFERE_SERVER_PORT:-45678}:45678"
+    volumes:
+      - ./sim/referee_server:/app
+    working_dir: /app
+    command: ["python3", "-c", "from http.server import HTTPServer; from referee_server import RefereeHandler; HTTPServer(('0.0.0.0', 45678), RefereeHandler).serve_forever()"]
     restart: "no"
 
   ros2_app:

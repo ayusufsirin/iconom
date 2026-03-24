@@ -31,6 +31,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Phase 4 Nav Isolation Check Script](./scripts/check-phase4-nav-isolation.sh)
 - [Phase 4 Dual Nav Loop Check Script](./scripts/check-phase4-dual-nav-loop.sh)
 - [Phase 4 Acceptance Script](./scripts/phase4-acceptance.sh)
+- [Phase 5 Referee Server Check Script](./scripts/check-phase5-referee-server.sh)
 - [PX4 Telemetry Check Script](./scripts/check-px4-telemetry.sh)
 - [Camera Bridge Check Script](./scripts/check-camera-bridge.sh)
 - [Camera Subscriber Check Script](./scripts/check-camera-subscriber.sh)
@@ -235,3 +236,22 @@ The phase-5 ownship adapter contract pins `iconom_telemetry_adapter` as the pack
 The phase-5 rival buffer contract pins `iconom_rival_buffer` as the package name, `rival_buffer.py` as the buffer script, and `/rival_buffer/get_history` as the service interface with a default 60-sample rolling buffer.
 
 The phase-5 predictor contract pins `iconom_predictor` as the package name, `predictor.py` as the predictor script, and `/competition/prediction/rival_position` as the output topic with a default 2-second prediction horizon.
+
+The phase-5 referee server implementation is in [sim/referee_server/referee_server.py](./sim/referee_server/referee_server.py). It provides deterministic endpoints:
+
+- `GET /health` - returns `{"status": "ok", "service": "referee"}`
+- `GET /time` - returns deterministic server time
+- `POST /login` - accepts fixture credentials `{"username":"test_pilot","password":"test_pass_123"}`, returns session token
+- `POST /telemetry` - accepts ownship payload, returns deterministic rival state
+
+To run the referee server check:
+
+```bash
+./scripts/check-phase5-referee-server.sh
+```
+
+Or via Docker:
+
+```bash
+docker compose --profile phase5 up referee_server
+```
