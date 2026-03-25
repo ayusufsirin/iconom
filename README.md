@@ -394,3 +394,28 @@ The maintained check now proves:
 - the cueing node publishes body-rate offboard setpoints
 - PX4 enters `OFFBOARD`
 - the published cue error drops into the forward cone
+
+
+## Phase 6 Live Rival Cueing
+
+The fifth phase-6 slice replaces the scripted rival with live `plane_02` data from the maintained dual-aircraft runtime. `plane_01` stays the ownship, `plane_02` becomes the live rival, and the cueing path reuses the maintained phase-5 competition topics plus the phase-6 guidance nodes.
+
+To run the headless live-rival cueing check:
+
+```bash
+./scripts/check-phase6-live-rival-cueing.sh
+```
+
+To run the GUI live-rival cueing check:
+
+```bash
+xhost +local:docker
+ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-cueing.sh
+```
+
+The maintained check now proves:
+- `plane_01` and `plane_02` start in the shared phase-4 runtime
+- both aircraft take off and stabilize
+- live `plane_02` state is published on `/competition/rival/state`
+- `plane_01` enters `OFFBOARD` against the real rival instead of a scripted target
+- the published cue error drops into the forward cone in both headless and GUI runs

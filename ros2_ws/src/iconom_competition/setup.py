@@ -22,6 +22,7 @@ setup(
             "ownship_telemetry_adapter = iconom_competition.ownship_telemetry_adapter:main",
             "rival_buffer = iconom_competition.rival_buffer:main",
             "predictor = iconom_competition.predictor:main",
+            "live_rival_state_adapter = iconom_competition.live_rival_state_adapter:main",
         ],
     },
 )
