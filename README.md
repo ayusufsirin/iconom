@@ -341,6 +341,13 @@ The maintained acceptance entrypoint for the current phase-6 baseline is:
 ./scripts/phase6-acceptance.sh --headless
 ```
 
+To run the maintained phase-6 acceptance flow with GUI for the final live-rival cueing step:
+
+```bash
+xhost +local:docker
+./scripts/phase6-acceptance.sh --gui
+```
+
 ## Phase 6 Target Selection
 
 The first phase-6 slice is the deterministic target selector in [ros2_ws/src/iconom_guidance](./ros2_ws/src/iconom_guidance). It consumes maintained ownship and rival `PoseStamped` topics, chooses the nearest rival deterministically, and publishes the current selection on `/guidance/selected_target`.
@@ -438,4 +445,11 @@ To run the maintained phase-6 acceptance flow:
 
 ```bash
 ./scripts/phase6-acceptance.sh --headless
+```
+
+To run the maintained phase-6 acceptance flow with GUI for the final live-rival cueing step:
+
+```bash
+xhost +local:docker
+./scripts/phase6-acceptance.sh --gui
 ```
