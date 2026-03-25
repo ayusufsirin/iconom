@@ -19,7 +19,11 @@ docker compose --env-file .env.example run --rm ros2_app bash -c '
     set -euo pipefail
     cd /workspaces/ros2_ws
     rm -rf build install log
-    colcon build --packages-select iconom_guidance --merge-install
+    mkdir -p /workspaces/ros2_ws/src
+    if [[ ! -d /workspaces/ros2_ws/src/px4_msgs ]]; then
+        vcs import /workspaces/ros2_ws/src < /workspaces/ros2_ws/src/px4_msgs.repos
+    fi
+    colcon build --packages-up-to px4_msgs iconom_guidance --merge-install
 
     set +u
     source install/setup.bash

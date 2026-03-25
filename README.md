@@ -333,7 +333,13 @@ The repaired headless acceptance path now passes through the real referee, compe
 
 The source-of-truth planning document for the next phase is [docs/phase-6-plan.md](./docs/phase-6-plan.md).
 
-Phase 6 is intentionally narrower than a full fighter round. It starts with deterministic target selection, then adds bounded intercept planning, one pursuit state machine, and one maintained camera-cueing proof before any visual lock logic.
+Phase 6 is intentionally narrower than a full fighter round. It starts with deterministic target selection, then adds bounded intercept planning, one pursuit state machine, scripted cueing, and a maintained live-rival cueing proof before any visual lock logic.
+
+The maintained acceptance entrypoint for the current phase-6 baseline is:
+
+```bash
+./scripts/phase6-acceptance.sh --headless
+```
 
 ## Phase 6 Target Selection
 
@@ -419,3 +425,17 @@ The maintained check now proves:
 - live `plane_02` state is published on `/competition/rival/state`
 - `plane_01` enters `OFFBOARD` against the real rival instead of a scripted target
 - the published cue error drops into the forward cone in both headless and GUI runs
+
+## Phase 6 Acceptance
+
+The maintained phase-6 acceptance wrapper runs the current pursuit-guidance baseline in sequence:
+- deterministic target selection
+- bounded intercept planning
+- pursuit state transitions
+- live-rival cueing against real `plane_02` data
+
+To run the maintained phase-6 acceptance flow:
+
+```bash
+./scripts/phase6-acceptance.sh --headless
+```

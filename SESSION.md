@@ -1,27 +1,34 @@
 # SESSION
 
 ## Goal
-Finish the fifth phase-6 slice: live-rival camera cueing for `plane_01` against real `plane_02` data from the maintained dual-aircraft runtime.
+Package the current phase-6 pursuit-guidance baseline behind one maintained acceptance entrypoint.
 
 ## Current status
-The live-rival cueing slice is implemented and validated headless and GUI. The maintained check now starts the shared phase-4 stack, brings both aircraft to loiter, republishes live `plane_02` state into `/competition/rival/state`, and verifies that `plane_01` reduces the published cue error while flying in `OFFBOARD`.
+`scripts/phase6-acceptance.sh` is implemented and the maintained headless phase-6 flow now runs target selection, intercept planning, pursuit state transitions, and live-rival cueing in sequence. The live-rival cueing slice remains validated in both headless and GUI mode.
 
 ## Files touched
-- /home/joseph/Projects/iconom/ros2_ws/src/iconom_competition/setup.py
-- /home/joseph/Projects/iconom/ros2_ws/src/iconom_competition/iconom_competition/live_rival_state_adapter.py
-- /home/joseph/Projects/iconom/scripts/check-phase6-live-rival-cueing.sh
+- /home/joseph/Projects/iconom/scripts/phase6-acceptance.sh
+- /home/joseph/Projects/iconom/scripts/check-phase6-target-selection.sh
+- /home/joseph/Projects/iconom/scripts/check-phase6-intercept-planner.sh
+- /home/joseph/Projects/iconom/scripts/check-phase6-pursuit-state-machine.sh
 - /home/joseph/Projects/iconom/README.md
+- /home/joseph/Projects/iconom/SESSION.md
 
 ## Last completed step
-Validated the live-rival cueing slice with `./scripts/check-phase6-live-rival-cueing.sh` and `ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-cueing.sh`.
+Validated the maintained phase-6 acceptance wrapper with `./scripts/phase6-acceptance.sh --headless`.
 
 ## Current blocker
 None
 
 ## Next exact step
-Review the uncommitted live-rival cueing slice and commit it with a conventional commit if it still looks correct.
+Review the uncommitted phase-6 acceptance slice and commit it with a conventional commit if it still looks correct.
 
 ## Validation
+```bash
+cd /home/joseph/Projects/iconom
+./scripts/phase6-acceptance.sh --headless
+```
+
 ```bash
 cd /home/joseph/Projects/iconom
 ./scripts/check-phase6-live-rival-cueing.sh
@@ -34,5 +41,6 @@ ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-cueing.sh
 ```
 
 ## Notes
-- The live-rival slice keeps `plane_01` as ownship and uses real `plane_02` telemetry as the rival source.
+- The maintained phase-6 acceptance path stays headless; GUI remains useful for the live-rival cueing slice itself.
+- The first cold acceptance run rebuilds `px4_msgs` inside the throwaway `ros2_app` containers, so it takes several minutes before the fast guidance checks finish.
 - Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, and `opencode.json.home_network` out of git.
