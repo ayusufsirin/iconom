@@ -1,52 +1,43 @@
 # SESSION
 
 ## Goal
-Decide whether phase 6 is complete enough to close or whether the scripted cue-geometry hardening check should be folded into the maintained phase-6 baseline first.
+Decide whether to fold the new real-sim live-rival geometry hardening check into the maintained phase-6 baseline, or keep it standalone and start phase-7 planning.
 
 ## Current status
-Phase 6 now has a maintained headless and GUI-capable acceptance path plus a separate scripted cue-geometry hardening check. The scripted check is committed and passes headless and GUI, but it is intentionally still outside `phase6-acceptance.sh`. There is also now a standalone SVG plot utility for visually comparing ownship and rival trajectories from the recorded CSV.
+Phase 6 now has a maintained headless and GUI-capable acceptance path, a standalone scripted cue-geometry hardening check, and a new standalone real-sim live-rival geometry hardening check. The new live-rival geometry check uses real `plane_02` state, records ownship-versus-rival geometry to CSV, and passes in both headless and GUI mode with sustained airborne catch plus successful landing of both aircraft.
 
 ## Files touched
 - /home/joseph/Projects/iconom/SESSION.md
 - /home/joseph/Projects/iconom/README.md
-- /home/joseph/Projects/iconom/scripts/phase6-acceptance.sh
-- /home/joseph/Projects/iconom/scripts/check-phase6-scripted-cue-geometry.sh
-- /home/joseph/Projects/iconom/scripts/plot-phase6-scripted-cue-geometry.py
-- /home/joseph/Projects/iconom/ros2_ws/src/iconom_guidance/iconom_guidance/cue_geometry_monitor.py
-- /home/joseph/Projects/iconom/ros2_ws/src/iconom_guidance/iconom_guidance/camera_cueing_bridge.py
-- /home/joseph/Projects/iconom/ros2_ws/src/iconom_competition/iconom_competition/live_rival_state_adapter.py
+- /home/joseph/Projects/iconom/scripts/check-phase6-live-rival-geometry.sh
+- /home/joseph/Projects/iconom/scripts/evaluate-phase6-geometry.py
 
 ## Last completed step
-Committed the standalone scripted cue-geometry hardening slice in `aaa4ed6` after validating it in both headless and GUI mode, then added a plot utility for the recorded CSV.
+Validated the standalone real-sim live-rival geometry hardening slice in both modes with `./scripts/check-phase6-live-rival-geometry.sh --incremental` and `ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-geometry.sh --incremental` after fixing the compose profile handling for `referee_server` and the missing `wait_for_topic` call.
 
 ## Current blocker
 None
 
 ## Next exact step
-Choose one: either wire `check-phase6-scripted-cue-geometry.sh` into `phase6-acceptance.sh`, or treat phase 6 as complete and start phase-7 planning.
+Choose one: either wire `check-phase6-live-rival-geometry.sh` into `phase6-acceptance.sh`, or keep it standalone and start phase-7 planning.
 
 ## Validation
 ```bash
 cd /home/joseph/Projects/iconom
-./scripts/phase6-acceptance.sh --headless
+./scripts/check-phase6-live-rival-geometry.sh --incremental
 ```
 
 ```bash
 cd /home/joseph/Projects/iconom
 xhost +local:docker
-./scripts/phase6-acceptance.sh --gui
+ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-geometry.sh --incremental
 ```
 
 ```bash
 cd /home/joseph/Projects/iconom
-./scripts/check-phase6-scripted-cue-geometry.sh --incremental
-```
-
-```bash
-cd /home/joseph/Projects/iconom
-python3 ./scripts/plot-phase6-scripted-cue-geometry.py ./ros2_ws/.tmp-phase6-scripted-cue-geometry.csv
+./scripts/phase6-acceptance.sh --headless
 ```
 
 ## Notes
-- `check-phase6-scripted-cue-geometry.sh` is a standalone hardening proof and is not part of `phase6-acceptance.sh` yet.
-- Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, `opencode.json.home_network`, and `ros2_ws/.tmp-phase6-scripted-cue-geometry.csv` out of git.
+- `check-phase6-live-rival-geometry.sh` is a stronger standalone hardening proof than the maintained phase-6 acceptance path; it is not wired into `phase6-acceptance.sh` yet.
+- Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, `opencode.json.home_network`, `ros2_ws/.tmp-phase6-live-rival-geometry.csv`, `ros2_ws/.tmp-phase6-scripted-cue-geometry.csv`, and `ros2_ws/.tmp-phase6-scripted-cue-geometry.csv.svg` out of git.
