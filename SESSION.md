@@ -1,10 +1,10 @@
 # SESSION
 
 ## Goal
-Reduce phase-6 acceptance runtime by bootstrapping the guidance workspace once and reusing it across the prechecks.
+Maintain the optimized phase-6 acceptance path as the current baseline for pursuit guidance and live-rival cueing.
 
 ## Current status
-`scripts/phase6-acceptance.sh` now bootstraps `px4_msgs` and `iconom_guidance` once, then reuses that workspace for the first three phase-6 checks. Both `./scripts/phase6-acceptance.sh --headless` and `./scripts/phase6-acceptance.sh --gui` pass with the optimized wrapper.
+`perf(phase6): reuse guidance workspace in acceptance` is committed at `bc69642`. `scripts/phase6-acceptance.sh` now bootstraps `px4_msgs` and `iconom_guidance` once, reuses that workspace across the first three checks, and still passes in both headless and GUI modes.
 
 ## Files touched
 - /home/joseph/Projects/iconom/scripts/check-phase6-target-selection.sh
@@ -14,13 +14,13 @@ Reduce phase-6 acceptance runtime by bootstrapping the guidance workspace once a
 - /home/joseph/Projects/iconom/SESSION.md
 
 ## Last completed step
-Validated the optimized phase-6 acceptance wrapper in both headless and GUI modes.
+Committed the optimized phase-6 acceptance slice after validating both `--headless` and `--gui`.
 
 ## Current blocker
 None
 
 ## Next exact step
-Review and commit the optimized phase-6 acceptance slice.
+None
 
 ## Validation
 ```bash
