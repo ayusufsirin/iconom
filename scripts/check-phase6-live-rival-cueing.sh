@@ -45,6 +45,41 @@ SELECTOR_PID=""
 PLANNER_PID=""
 STATE_MACHINE_PID=""
 CUEING_PID=""
+COLD_BUILD="${ICONOM_PHASE6_COLD_BUILD:-0}"
+
+usage() {
+  cat <<'USAGE'
+Usage: check-phase6-live-rival-cueing.sh [--incremental|--cold]
+
+Run the maintained phase-6 live-rival cueing check.
+
+Environment:
+  ICONOM_PHASE6_COLD_BUILD=0|1
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --cold)
+      COLD_BUILD=1
+      shift
+      ;;
+    --incremental)
+      COLD_BUILD=0
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -478,19 +513,22 @@ for service in gazebo referee_server xrce_agent ros2_app; do
   fi
 done
 
-echo "step 5: building PX4 message, control, competition, and guidance packages"
-ros2_exec '
+echo "step 5: preparing PX4 message, control, competition, and guidance packages"
+ros2_exec "
   set -euo pipefail
   set +u
   source /opt/ros/humble/setup.bash
   set -u
+  cd /workspaces/ros2_ws
+  if [[ "${COLD_BUILD}" == "1" ]]; then
+    rm -rf build install log
+  fi
   mkdir -p /workspaces/ros2_ws/src
   if [[ ! -d /workspaces/ros2_ws/src/px4_msgs ]]; then
     vcs import /workspaces/ros2_ws/src < /workspaces/ros2_ws/src/px4_msgs.repos
   fi
-  cd /workspaces/ros2_ws
   colcon build --merge-install --packages-up-to px4_msgs iconom_control iconom_competition iconom_guidance
-'
+"
 
 echo "step 6: launching plane_01 and plane_02 PX4 runtimes"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" run --rm --no-deps -T \
@@ -596,7 +634,7 @@ fi
 
 echo "initial cue error: ${INITIAL_CUE_ERROR} deg"
 
-echo "step 15: confirming the cueing bridge emits body-rate offboard setpoints"
+echo "step 15: confirming the cueing bridge emits PX4 attitude offboard setpoints"
 for ((i=1; i<=30; i++)); do
   if grep -q 'published cueing offboard setpoint' "${CUEING_LOG}"; then
     break
@@ -604,7 +642,7 @@ for ((i=1; i<=30; i++)); do
   sleep 1
 done
 if ! grep -q 'published cueing offboard setpoint' "${CUEING_LOG}"; then
-  echo "camera cueing bridge did not publish any offboard setpoint against the live rival" >&2
+  echo "camera cueing bridge did not publish any PX4 attitude offboard setpoint against the live rival" >&2
   cat "${CUEING_LOG}" >&2 || true
   exit 206
 fi

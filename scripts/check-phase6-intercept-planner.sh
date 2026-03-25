@@ -3,30 +3,67 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REUSE_WORKSPACE="${ICONOM_PHASE6_REUSE_WORKSPACE:-0}"
+COLD_BUILD="${ICONOM_PHASE6_COLD_BUILD:-0}"
+
+usage() {
+  cat <<'USAGE'
+Usage: check-phase6-intercept-planner.sh [--incremental|--cold]
+
+Run the current phase-6 intercept-planner check.
+
+Environment:
+  ICONOM_PHASE6_REUSE_WORKSPACE=0|1
+  ICONOM_PHASE6_COLD_BUILD=0|1
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --cold)
+      COLD_BUILD=1
+      shift
+      ;;
+    --incremental)
+      COLD_BUILD=0
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
 
 echo "iconom phase-6 intercept-planner check"
 echo
 
-if [[ "${REUSE_WORKSPACE}" != "1" ]]; then
-  echo "================================================================"
-  echo "building iconom_guidance package"
-  echo "================================================================"
-  cd "${ROOT_DIR}"
-  docker compose --env-file .env.example build ros2_app
-else
+if [[ "${REUSE_WORKSPACE}" == "1" ]]; then
   echo "================================================================"
   echo "reusing prepared phase-6 workspace"
   echo "================================================================"
+else
+  echo "================================================================"
+  echo "preparing phase-6 guidance workspace ($([[ "${COLD_BUILD}" == "1" ]] && echo cold rebuild || echo incremental build))"
+  echo "================================================================"
+  cd "${ROOT_DIR}"
+  docker compose --env-file .env.example build ros2_app
 fi
 
 echo "================================================================"
 echo "running bounded intercept-planner path"
 echo "================================================================"
-docker compose --env-file .env.example run --rm -e ICONOM_PHASE6_REUSE_WORKSPACE="${REUSE_WORKSPACE}" ros2_app bash -c '
+docker compose --env-file .env.example run --rm -e ICONOM_PHASE6_REUSE_WORKSPACE="${REUSE_WORKSPACE}" -e ICONOM_PHASE6_COLD_BUILD="${COLD_BUILD}" ros2_app bash -c '
     set -euo pipefail
     cd /workspaces/ros2_ws
     if [[ "${ICONOM_PHASE6_REUSE_WORKSPACE:-0}" != "1" ]]; then
-        rm -rf build install log
+        if [[ "${ICONOM_PHASE6_COLD_BUILD:-0}" == "1" ]]; then
+            rm -rf build install log
+        fi
         mkdir -p /workspaces/ros2_ws/src
         if [[ ! -d /workspaces/ros2_ws/src/px4_msgs ]]; then
             vcs import /workspaces/ros2_ws/src < /workspaces/ros2_ws/src/px4_msgs.repos

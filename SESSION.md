@@ -1,19 +1,22 @@
 # SESSION
 
 ## Goal
-Stabilize the phase-6 live-rival cueing slice using PX4-supported offboard attitude setpoints so a real airborne catch is followed by successful landing of both aircraft.
+Keep the phase-6 build path incremental by default so maintained checks stop forcing cold ROS workspace rebuilds unless explicitly requested.
 
 ## Current status
-The live-rival cueing path now uses `OffboardControlMode.attitude=true` plus `VehicleAttitudeSetpoint` instead of raw body-rate setpoints. `ownship_telemetry_adapter.py` publishes ownship state on PX4 local-position cadence, and `check-phase6-live-rival-cueing.sh` now requires a sustained airborne catch before landing both aircraft. The revised headless live-rival cueing check now passes end to end.
+Phase-6 scripts now default to incremental workspace reuse and accept `--cold` only when a clean rebuild is actually desired. The maintained headless wrapper `./scripts/phase6-acceptance.sh --headless` passes after the change, and the live-rival cueing slice also passes with `./scripts/check-phase6-live-rival-cueing.sh --incremental`.
 
 ## Files touched
-- /home/joseph/Projects/iconom/ros2_ws/src/iconom_competition/iconom_competition/ownship_telemetry_adapter.py
-- /home/joseph/Projects/iconom/ros2_ws/src/iconom_guidance/iconom_guidance/camera_cueing_bridge.py
+- /home/joseph/Projects/iconom/scripts/phase6-acceptance.sh
+- /home/joseph/Projects/iconom/scripts/check-phase6-target-selection.sh
+- /home/joseph/Projects/iconom/scripts/check-phase6-intercept-planner.sh
+- /home/joseph/Projects/iconom/scripts/check-phase6-pursuit-state-machine.sh
 - /home/joseph/Projects/iconom/scripts/check-phase6-live-rival-cueing.sh
+- /home/joseph/Projects/iconom/README.md
 - /home/joseph/Projects/iconom/SESSION.md
 
 ## Last completed step
-Reworked the cueing bridge to use PX4 attitude setpoints, reran `./scripts/check-phase6-live-rival-cueing.sh`, and got a truthful green run with airborne catch and post-catch landing of both aircraft.
+Switched phase-6 checks and the maintained wrapper to incremental-by-default workspace builds, reran the maintained headless acceptance, and confirmed that the lightweight checks reuse the prepared workspace while the live-rival cueing slice still passes.
 
 ## Current blocker
 None
@@ -24,10 +27,15 @@ None
 ## Validation
 ```bash
 cd /home/joseph/Projects/iconom
-./scripts/check-phase6-live-rival-cueing.sh
+./scripts/check-phase6-live-rival-cueing.sh --incremental
+```
+
+```bash
+cd /home/joseph/Projects/iconom
+./scripts/phase6-acceptance.sh --headless
 ```
 
 ## Notes
+- Phase-6 builds are incremental by default; use `--cold` only for an intentional clean rebuild.
+- The lightweight phase-6 checks now reuse the prepared workspace when invoked through `phase6-acceptance.sh`.
 - Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, and `opencode.json.home_network` out of git.
-- Phase-6 live-rival cueing now depends on PX4 attitude setpoints, not repo-owned raw rate setpoints.
-- The acceptance is intentionally strict: success requires a sustained airborne catch before both aircraft land.

@@ -3,19 +3,27 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${ICONOM_PHASE6_MODE:-headless}"
+COLD_BUILD="${ICONOM_PHASE6_COLD_BUILD:-0}"
 
 declare -a PRECHECKS=()
 FINAL_CHECK=""
 
 bootstrap_prechecks() {
+  local build_label="incremental build"
+  if [[ "${COLD_BUILD}" == "1" ]]; then
+    build_label="cold rebuild"
+  fi
+
   echo "================================================================"
-  echo "bootstrapping shared phase-6 guidance workspace"
+  echo "bootstrapping shared phase-6 guidance workspace (${build_label})"
   echo "================================================================"
   docker compose --env-file .env.example build ros2_app
-  docker compose --env-file .env.example run --rm ros2_app bash -c '
+  docker compose --env-file .env.example run --rm -e ICONOM_PHASE6_COLD_BUILD="${COLD_BUILD}" ros2_app bash -c '
     set -euo pipefail
     cd /workspaces/ros2_ws
-    rm -rf build install log
+    if [[ "${ICONOM_PHASE6_COLD_BUILD:-0}" == "1" ]]; then
+      rm -rf build install log
+    fi
     mkdir -p /workspaces/ros2_ws/src
     if [[ ! -d /workspaces/ros2_ws/src/px4_msgs ]]; then
       vcs import /workspaces/ros2_ws/src < /workspaces/ros2_ws/src/px4_msgs.repos
@@ -27,12 +35,13 @@ bootstrap_prechecks() {
 
 usage() {
   cat <<'USAGE'
-Usage: phase6-acceptance.sh [--headless|--gui]
+Usage: phase6-acceptance.sh [--headless|--gui] [--incremental|--cold]
 
 Run the current phase-6 acceptance flow for pursuit guidance and live-rival cueing.
 
 Environment:
   ICONOM_PHASE6_MODE=headless|gui
+  ICONOM_PHASE6_COLD_BUILD=0|1
 USAGE
 }
 
@@ -44,6 +53,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --gui)
       MODE="gui"
+      shift
+      ;;
+    --cold)
+      COLD_BUILD=1
+      shift
+      ;;
+    --incremental)
+      COLD_BUILD=0
       shift
       ;;
     -h|--help)
@@ -86,6 +103,7 @@ FINAL_CHECK="${ROOT_DIR}/scripts/check-phase6-live-rival-cueing.sh"
 
 echo "iconom phase-6 acceptance"
 echo "mode: ${MODE}"
+echo "build mode: $([[ "${COLD_BUILD}" == "1" ]] && echo cold || echo incremental)"
 echo
 echo "this runs the maintained phase-6 validation flow for pursuit guidance and live-rival cueing."
 echo
@@ -95,7 +113,7 @@ for check in "${PRECHECKS[@]}"; do
   echo "================================================================"
   echo "running $(basename "${check}")"
   echo "================================================================"
-  ICONOM_PHASE6_REUSE_WORKSPACE=1 PX4_HEADLESS=1 ICONOM_USE_GUI= "${check}"
+  ICONOM_PHASE6_REUSE_WORKSPACE=1 ICONOM_PHASE6_COLD_BUILD=0 PX4_HEADLESS=1 ICONOM_USE_GUI= "${check}"
   echo
 done
 
@@ -103,9 +121,9 @@ echo "================================================================"
 echo "running $(basename "${FINAL_CHECK}")"
 echo "================================================================"
 if [[ "${MODE}" == "gui" ]]; then
-  ICONOM_USE_GUI=1 PX4_HEADLESS=0 "${FINAL_CHECK}"
+  ICONOM_PHASE6_COLD_BUILD="${COLD_BUILD}" ICONOM_USE_GUI=1 PX4_HEADLESS=0 "${FINAL_CHECK}"
 else
-  PX4_HEADLESS=1 ICONOM_USE_GUI= "${FINAL_CHECK}"
+  ICONOM_PHASE6_COLD_BUILD="${COLD_BUILD}" PX4_HEADLESS=1 ICONOM_USE_GUI= "${FINAL_CHECK}"
 fi
 echo
 

@@ -341,12 +341,16 @@ The maintained acceptance entrypoint for the current phase-6 baseline is:
 ./scripts/phase6-acceptance.sh --headless
 ```
 
+Phase-6 builds are incremental by default. Use `--cold` only when you want a clean rebuild of the ROS workspace.
+
 To run the maintained phase-6 acceptance flow with GUI for the final live-rival cueing step:
 
 ```bash
 xhost +local:docker
 ./scripts/phase6-acceptance.sh --gui
 ```
+
+To force a clean rebuild before the maintained flow, run `./scripts/phase6-acceptance.sh --headless --cold` or `./scripts/phase6-acceptance.sh --gui --cold`.
 
 ## Phase 6 Target Selection
 
@@ -419,12 +423,16 @@ To run the headless live-rival cueing check:
 ./scripts/check-phase6-live-rival-cueing.sh
 ```
 
+This check also uses incremental workspace builds by default; add `--cold` only when you need a clean rebuild.
+
 To run the GUI live-rival cueing check:
 
 ```bash
 xhost +local:docker
 ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-cueing.sh
 ```
+
+This check also uses incremental workspace builds by default; add `--cold` only when you need a clean rebuild.
 
 The maintained check now proves:
 - `plane_01` and `plane_02` start in the shared phase-4 runtime
@@ -447,9 +455,13 @@ To run the maintained phase-6 acceptance flow:
 ./scripts/phase6-acceptance.sh --headless
 ```
 
+Phase-6 builds are incremental by default. Use `--cold` only when you want a clean rebuild of the ROS workspace.
+
 To run the maintained phase-6 acceptance flow with GUI for the final live-rival cueing step:
 
 ```bash
 xhost +local:docker
 ./scripts/phase6-acceptance.sh --gui
 ```
+
+To force a clean rebuild before the maintained flow, run `./scripts/phase6-acceptance.sh --headless --cold` or `./scripts/phase6-acceptance.sh --gui --cold`.
