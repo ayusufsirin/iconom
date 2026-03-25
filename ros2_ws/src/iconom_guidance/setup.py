@@ -23,6 +23,7 @@ setup(
             "pursuit_state_machine = iconom_guidance.pursuit_state_machine:main",
             "scripted_rival_publisher = iconom_guidance.scripted_rival_publisher:main",
             "camera_cueing_bridge = iconom_guidance.camera_cueing_bridge:main",
+            "cue_geometry_monitor = iconom_guidance.cue_geometry_monitor:main",
         ],
     },
 )

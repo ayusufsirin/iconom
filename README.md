@@ -408,7 +408,7 @@ ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-camera-cueing.sh
 The maintained check now proves:
 - `plane_01` takes off and stabilizes
 - a deterministic scripted rival is injected into the guidance path
-- the cueing node publishes body-rate offboard setpoints
+- the cueing node publishes PX4 attitude offboard setpoints
 - PX4 enters `OFFBOARD`
 - the published cue error drops into the forward cone
 
@@ -440,6 +440,25 @@ The maintained check now proves:
 - live `plane_02` state is published on `/competition/rival/state`
 - `plane_01` enters `OFFBOARD` against the real rival instead of a scripted target
 - the published cue error drops into the forward cone in both headless and GUI runs
+
+## Phase 6 Scripted Cue Geometry Hardening
+
+The live-rival cueing slice is the maintained phase-6 baseline, but there is also a standalone hardening check for route-comparison evidence against a deterministic moving scripted rival. It keeps `plane_01` as the real simulated ownship, records ownship-versus-rival geometry to CSV, and only passes if a sustained forward-cone catch occurs while `plane_01` is still airborne and then lands cleanly afterward.
+
+To run the headless scripted cue-geometry hardening check:
+
+```bash
+./scripts/check-phase6-scripted-cue-geometry.sh --incremental
+```
+
+To run the GUI scripted cue-geometry hardening check:
+
+```bash
+xhost +local:docker
+ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-scripted-cue-geometry.sh --incremental
+```
+
+This standalone check is not part of `phase6-acceptance.sh` yet. It exists to harden the meaning of camera cueing with route-comparison evidence before phase 7 visual-lock work.
 
 ## Phase 6 Acceptance
 

@@ -1,41 +1,48 @@
 # SESSION
 
 ## Goal
-Keep the phase-6 build path incremental by default so maintained checks stop forcing cold ROS workspace rebuilds unless explicitly requested.
+Finish the standalone phase-6 scripted cue-geometry hardening slice so camera cueing is backed by route-comparison evidence, not just a transient cone hit.
 
 ## Current status
-Phase-6 scripts now default to incremental workspace reuse and accept `--cold` only when a clean rebuild is actually desired. The maintained headless wrapper `./scripts/phase6-acceptance.sh --headless` passes after the change, and the live-rival cueing slice also passes with `./scripts/check-phase6-live-rival-cueing.sh --incremental`.
+The scripted hardening slice is now implemented and validated. `./scripts/check-phase6-scripted-cue-geometry.sh --incremental` passes headless, and `ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-scripted-cue-geometry.sh --incremental` also passes. The maintained phase-6 baseline is still `phase6-acceptance.sh`; the scripted geometry check remains a standalone hardening proof.
 
 ## Files touched
-- /home/joseph/Projects/iconom/scripts/phase6-acceptance.sh
-- /home/joseph/Projects/iconom/scripts/check-phase6-target-selection.sh
-- /home/joseph/Projects/iconom/scripts/check-phase6-intercept-planner.sh
-- /home/joseph/Projects/iconom/scripts/check-phase6-pursuit-state-machine.sh
-- /home/joseph/Projects/iconom/scripts/check-phase6-live-rival-cueing.sh
 - /home/joseph/Projects/iconom/README.md
 - /home/joseph/Projects/iconom/SESSION.md
+- /home/joseph/Projects/iconom/ros2_ws/src/iconom_control/iconom_control/vehicle_local_position_waiter.py
+- /home/joseph/Projects/iconom/ros2_ws/src/iconom_guidance/iconom_guidance/scripted_rival_publisher.py
+- /home/joseph/Projects/iconom/ros2_ws/src/iconom_guidance/iconom_guidance/cue_geometry_monitor.py
+- /home/joseph/Projects/iconom/ros2_ws/src/iconom_guidance/setup.py
+- /home/joseph/Projects/iconom/scripts/check-phase6-scripted-cue-geometry.sh
 
 ## Last completed step
-Switched phase-6 checks and the maintained wrapper to incremental-by-default workspace builds, reran the maintained headless acceptance, and confirmed that the lightweight checks reuse the prepared workspace while the live-rival cueing slice still passes.
+Validated the scripted cue-geometry check in headless and GUI mode after moving the climb gate before `mode_loiter` and switching the acceptance decision to CSV-based sustained-window validation.
 
 ## Current blocker
 None
 
 ## Next exact step
-None
+Commit the scripted cue-geometry hardening slice and keep the generated `ros2_ws/.tmp-phase6-scripted-cue-geometry.csv` artifact out of git.
 
 ## Validation
 ```bash
 cd /home/joseph/Projects/iconom
-./scripts/check-phase6-live-rival-cueing.sh --incremental
+bash -n ./scripts/check-phase6-scripted-cue-geometry.sh
 ```
 
 ```bash
 cd /home/joseph/Projects/iconom
-./scripts/phase6-acceptance.sh --headless
+./scripts/check-phase6-scripted-cue-geometry.sh --incremental
+```
+
+```bash
+cd /home/joseph/Projects/iconom
+xhost +local:docker
+ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-scripted-cue-geometry.sh --incremental
 ```
 
 ## Notes
-- Phase-6 builds are incremental by default; use `--cold` only for an intentional clean rebuild.
-- The lightweight phase-6 checks now reuse the prepared workspace when invoked through `phase6-acceptance.sh`.
-- Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, and `opencode.json.home_network` out of git.
+- The scripted cue-geometry slice is intentionally standalone and is not wired into `phase6-acceptance.sh` yet.
+- The pre-cue climb gate now happens during `NAV_TAKEOFF` before `mode_loiter`, which was necessary to avoid low-altitude false catches.
+- The check now lands first and decides success from the recorded sustained geometry window in the CSV artifact.
+- Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, `opencode.json.home_network`, and `ros2_ws/.tmp-phase6-scripted-cue-geometry.csv` out of git.

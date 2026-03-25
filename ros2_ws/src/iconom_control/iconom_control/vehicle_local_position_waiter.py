@@ -42,6 +42,12 @@ class VehicleLocalPositionWaiter(Node):
         self.min_delta_xy_norm = self._parse_optional_float(
             os.environ.get("PX4_MIN_DELTA_XY_NORM")
         )
+        self.min_altitude_agl = self._parse_optional_float(
+            os.environ.get("PX4_MIN_ALTITUDE_AGL")
+        )
+        self.max_altitude_agl = self._parse_optional_float(
+            os.environ.get("PX4_MAX_ALTITUDE_AGL")
+        )
         self.start_time = time.monotonic()
         self.failed = False
         self.success = False
@@ -66,7 +72,8 @@ class VehicleLocalPositionWaiter(Node):
             f"for deltas x=[{self.min_delta_x!r}, {self.max_delta_x!r}] "
             f"y=[{self.min_delta_y!r}, {self.max_delta_y!r}] "
             f"z=[{self.min_delta_z!r}, {self.max_delta_z!r}] "
-            f"xy_norm>={self.min_delta_xy_norm!r}"
+            f"xy_norm>={self.min_delta_xy_norm!r} "
+            f"altitude_agl=[{self.min_altitude_agl!r}, {self.max_altitude_agl!r}]"
         )
 
     def _parse_optional_float(self, value: str | None) -> float | None:
@@ -83,6 +90,20 @@ class VehicleLocalPositionWaiter(Node):
             return False
         return True
 
+    def _has_delta_constraints(self) -> bool:
+        return any(
+            value is not None
+            for value in (
+                self.min_delta_x,
+                self.max_delta_x,
+                self.min_delta_y,
+                self.max_delta_y,
+                self.min_delta_z,
+                self.max_delta_z,
+                self.min_delta_xy_norm,
+            )
+        )
+
     def _handle_local_position(self, message: VehicleLocalPosition) -> None:
         if not message.xy_valid or not message.z_valid:
             self.last_summary = (
@@ -90,27 +111,33 @@ class VehicleLocalPositionWaiter(Node):
             )
             return
 
+        altitude_agl = -float(message.z)
+
         if self.initial_position is None:
             self.initial_position = (float(message.x), float(message.y), float(message.z))
             self.get_logger().info(
                 "seeded local position baseline "
                 f"x={self.initial_position[0]:.2f} "
                 f"y={self.initial_position[1]:.2f} "
-                f"z={self.initial_position[2]:.2f}"
+                f"z={self.initial_position[2]:.2f} "
+                f"altitude_agl={altitude_agl:.2f}"
             )
-            return
+            if self._has_delta_constraints():
+                return
 
+        assert self.initial_position is not None
         delta_x = float(message.x) - self.initial_position[0]
         delta_y = float(message.y) - self.initial_position[1]
         delta_z = float(message.z) - self.initial_position[2]
         delta_xy_norm = math.hypot(delta_x, delta_y)
         self.last_summary = (
             f"x={message.x:.2f} y={message.y:.2f} z={message.z:.2f} "
+            f"altitude_agl={altitude_agl:.2f} "
             f"delta_x={delta_x:.2f} delta_y={delta_y:.2f} "
             f"delta_z={delta_z:.2f} delta_xy_norm={delta_xy_norm:.2f}"
         )
 
-        if (
+        delta_match = (
             self._within_bounds(delta_x, self.min_delta_x, self.max_delta_x)
             and self._within_bounds(delta_y, self.min_delta_y, self.max_delta_y)
             and self._within_bounds(delta_z, self.min_delta_z, self.max_delta_z)
@@ -118,7 +145,12 @@ class VehicleLocalPositionWaiter(Node):
                 self.min_delta_xy_norm is None
                 or delta_xy_norm >= self.min_delta_xy_norm
             )
-        ):
+        )
+        altitude_match = self._within_bounds(
+            altitude_agl, self.min_altitude_agl, self.max_altitude_agl
+        )
+
+        if delta_match and altitude_match:
             self.success = True
             self.get_logger().info(f"matched local position {self.last_summary}")
 
