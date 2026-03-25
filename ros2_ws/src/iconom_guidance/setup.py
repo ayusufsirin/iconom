@@ -21,6 +21,8 @@ setup(
             "target_selector = iconom_guidance.target_selector:main",
             "intercept_planner = iconom_guidance.intercept_planner:main",
             "pursuit_state_machine = iconom_guidance.pursuit_state_machine:main",
+            "scripted_rival_publisher = iconom_guidance.scripted_rival_publisher:main",
+            "camera_cueing_bridge = iconom_guidance.camera_cueing_bridge:main",
         ],
     },
 )

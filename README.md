@@ -370,3 +370,27 @@ To run the pursuit-state-machine check:
 ```
 
 The maintained check launches the real state machine and requires the deterministic transition sequence `idle -> search -> pursue -> reacquire -> idle` from controlled topic inputs.
+
+## Phase 6 Camera Cueing
+
+The fourth phase-6 slice is the first aircraft cueing proof in [ros2_ws/src/iconom_guidance](./ros2_ws/src/iconom_guidance). It keeps the maintained phase-5/phase-6 guidance inputs, then uses a repo-owned offboard body-rate controller to steer `plane_01` so the selected rival moves into the forward camera cone.
+
+To run the headless camera-cueing check:
+
+```bash
+./scripts/check-phase6-camera-cueing.sh
+```
+
+To run the GUI camera-cueing check:
+
+```bash
+xhost +local:docker
+ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-camera-cueing.sh
+```
+
+The maintained check now proves:
+- `plane_01` takes off and stabilizes
+- a deterministic scripted rival is injected into the guidance path
+- the cueing node publishes body-rate offboard setpoints
+- PX4 enters `OFFBOARD`
+- the published cue error drops into the forward cone
