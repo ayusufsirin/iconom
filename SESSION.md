@@ -1,24 +1,26 @@
 # SESSION
 
 ## Goal
-Extend the maintained phase-6 acceptance entrypoint so it can also run in GUI mode.
+Reduce phase-6 acceptance runtime by bootstrapping the guidance workspace once and reusing it across the prechecks.
 
 ## Current status
-`scripts/phase6-acceptance.sh` now supports both `--headless` and `--gui`. The maintained headless flow passes, and the GUI flow runs the same phase-6 sequence with the final live-rival cueing step visible in Gazebo.
+`scripts/phase6-acceptance.sh` now bootstraps `px4_msgs` and `iconom_guidance` once, then reuses that workspace for the first three phase-6 checks. Both `./scripts/phase6-acceptance.sh --headless` and `./scripts/phase6-acceptance.sh --gui` pass with the optimized wrapper.
 
 ## Files touched
+- /home/joseph/Projects/iconom/scripts/check-phase6-target-selection.sh
+- /home/joseph/Projects/iconom/scripts/check-phase6-intercept-planner.sh
+- /home/joseph/Projects/iconom/scripts/check-phase6-pursuit-state-machine.sh
 - /home/joseph/Projects/iconom/scripts/phase6-acceptance.sh
-- /home/joseph/Projects/iconom/README.md
 - /home/joseph/Projects/iconom/SESSION.md
 
 ## Last completed step
-Validated the GUI-capable phase-6 acceptance wrapper with `xhost +local:docker` and `./scripts/phase6-acceptance.sh --gui`.
+Validated the optimized phase-6 acceptance wrapper in both headless and GUI modes.
 
 ## Current blocker
 None
 
 ## Next exact step
-Review the uncommitted GUI-acceptance slice and commit it with a conventional commit if it still looks correct.
+Review and commit the optimized phase-6 acceptance slice.
 
 ## Validation
 ```bash
@@ -33,5 +35,6 @@ xhost +local:docker
 ```
 
 ## Notes
+- The first cold acceptance run still bootstraps `px4_msgs` once; the first three checks now reuse that prepared workspace instead of rebuilding it three times.
 - GUI mode is only visually meaningful for the final live-rival cueing step; the earlier phase-6 checks remain non-visual.
 - Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, and `opencode.json.home_network` out of git.

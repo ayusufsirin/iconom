@@ -7,6 +7,24 @@ MODE="${ICONOM_PHASE6_MODE:-headless}"
 declare -a PRECHECKS=()
 FINAL_CHECK=""
 
+bootstrap_prechecks() {
+  echo "================================================================"
+  echo "bootstrapping shared phase-6 guidance workspace"
+  echo "================================================================"
+  docker compose --env-file .env.example build ros2_app
+  docker compose --env-file .env.example run --rm ros2_app bash -c '
+    set -euo pipefail
+    cd /workspaces/ros2_ws
+    rm -rf build install log
+    mkdir -p /workspaces/ros2_ws/src
+    if [[ ! -d /workspaces/ros2_ws/src/px4_msgs ]]; then
+      vcs import /workspaces/ros2_ws/src < /workspaces/ros2_ws/src/px4_msgs.repos
+    fi
+    colcon build --packages-up-to px4_msgs iconom_guidance --merge-install
+  '
+  echo
+}
+
 usage() {
   cat <<'USAGE'
 Usage: phase6-acceptance.sh [--headless|--gui]
@@ -72,11 +90,12 @@ echo
 echo "this runs the maintained phase-6 validation flow for pursuit guidance and live-rival cueing."
 echo
 
+bootstrap_prechecks
 for check in "${PRECHECKS[@]}"; do
   echo "================================================================"
   echo "running $(basename "${check}")"
   echo "================================================================"
-  PX4_HEADLESS=1 ICONOM_USE_GUI= "${check}"
+  ICONOM_PHASE6_REUSE_WORKSPACE=1 PX4_HEADLESS=1 ICONOM_USE_GUI= "${check}"
   echo
 done
 

@@ -2,28 +2,42 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REUSE_WORKSPACE="${ICONOM_PHASE6_REUSE_WORKSPACE:-0}"
 
 echo "iconom phase-6 intercept-planner check"
 echo
 
-echo "================================================================"
-echo "building iconom_guidance package"
-echo "================================================================"
-cd "${ROOT_DIR}"
-docker compose --env-file .env.example build ros2_app
+if [[ "${REUSE_WORKSPACE}" != "1" ]]; then
+  echo "================================================================"
+  echo "building iconom_guidance package"
+  echo "================================================================"
+  cd "${ROOT_DIR}"
+  docker compose --env-file .env.example build ros2_app
+else
+  echo "================================================================"
+  echo "reusing prepared phase-6 workspace"
+  echo "================================================================"
+fi
 
 echo "================================================================"
 echo "running bounded intercept-planner path"
 echo "================================================================"
-docker compose --env-file .env.example run --rm ros2_app bash -c '
+docker compose --env-file .env.example run --rm -e ICONOM_PHASE6_REUSE_WORKSPACE="${REUSE_WORKSPACE}" ros2_app bash -c '
     set -euo pipefail
     cd /workspaces/ros2_ws
-    rm -rf build install log
-    mkdir -p /workspaces/ros2_ws/src
-    if [[ ! -d /workspaces/ros2_ws/src/px4_msgs ]]; then
-        vcs import /workspaces/ros2_ws/src < /workspaces/ros2_ws/src/px4_msgs.repos
+    if [[ "${ICONOM_PHASE6_REUSE_WORKSPACE:-0}" != "1" ]]; then
+        rm -rf build install log
+        mkdir -p /workspaces/ros2_ws/src
+        if [[ ! -d /workspaces/ros2_ws/src/px4_msgs ]]; then
+            vcs import /workspaces/ros2_ws/src < /workspaces/ros2_ws/src/px4_msgs.repos
+        fi
+        colcon build --packages-up-to px4_msgs iconom_guidance --merge-install
     fi
-    colcon build --packages-up-to px4_msgs iconom_guidance --merge-install
+
+    if [[ ! -f install/setup.bash ]]; then
+        echo "missing install/setup.bash for phase-6 guidance workspace" >&2
+        exit 1
+    fi
 
     set +u
     source install/setup.bash
