@@ -460,6 +460,18 @@ ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-scripted-cue-geometry.sh 
 
 This standalone check is not part of `phase6-acceptance.sh` yet. It exists to harden the meaning of camera cueing with route-comparison evidence before phase 7 visual-lock work.
 
+To render the latest scripted cue CSV as a standalone SVG:
+
+```bash
+python3 ./scripts/plot-phase6-scripted-cue-geometry.py ./ros2_ws/.tmp-phase6-scripted-cue-geometry.csv
+```
+
+You can also choose the output path explicitly:
+
+```bash
+python3 ./scripts/plot-phase6-scripted-cue-geometry.py ./ros2_ws/.tmp-phase6-scripted-cue-geometry.csv --output /tmp/phase6-scripted-cue.svg
+```
+
 ## Phase 6 Acceptance
 
 The maintained phase-6 acceptance wrapper runs the current pursuit-guidance baseline in sequence:
