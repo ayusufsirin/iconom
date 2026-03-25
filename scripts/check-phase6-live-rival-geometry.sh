@@ -24,6 +24,10 @@ PLANE2_ARM_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-arm.log"
 PLANE2_TAKEOFF_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-takeoff.log"
 PLANE2_LOITER_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-loiter.log"
 PLANE2_REPOSITION_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-reposition.log"
+PLANE2_ROUTE_POINT1_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-route-point1.log"
+PLANE2_ROUTE_POINT2_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-route-point2.log"
+PLANE2_ROUTE_POINT3_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-route-point3.log"
+PLANE2_ROUTE_POINT4_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-route-point4.log"
 PLANE2_LAND_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-land.log"
 PLANE2_LAND_POSITION_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-land-position.log"
 PLANE2_LAND_DETECTED_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-land-detected.log"
@@ -49,6 +53,7 @@ PLANNER_PID=""
 STATE_MACHINE_PID=""
 CUEING_PID=""
 MONITOR_PID=""
+RIVAL_ROUTE_PID=""
 COLD_BUILD="${ICONOM_PHASE6_COLD_BUILD:-0}"
 
 usage() {
@@ -116,6 +121,7 @@ cleanup() {
   stop_pid "${PREDICTOR_PID}"
   stop_pid "${RIVAL_ADAPTER_PID}"
   stop_pid "${OWNSHIP_ADAPTER_PID}"
+  stop_pid "${RIVAL_ROUTE_PID}"
   stop_pid "${PX4_PID_2}"
   stop_pid "${PX4_PID_1}"
   if [[ "${exit_code}" == "0" ]]; then
@@ -216,6 +222,35 @@ run_navigation_command() {
 ${extra_env}
     ros2 run iconom_control navigation_command_client
   " >"${output_file}" 2>&1
+}
+
+run_live_rival_rectangle_route() {
+  run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" 'do_reposition' "${PLANE2_SYS_ID}" "${PLANE2_ROUTE_POINT1_LOG}" "    export PX4_TARGET_OFFSET_NORTH_M='${PLANE2_ROUTE_POINT1_NORTH_M}'
+    export PX4_TARGET_OFFSET_EAST_M='${PLANE2_ROUTE_POINT1_EAST_M}'
+    export PX4_TARGET_OFFSET_ALT_M='${PLANE2_ROUTE_POINT_ALT_M}'
+    export PX4_LOITER_RADIUS_M='${PLANE2_ROUTE_LOITER_RADIUS_M}'
+    export PX4_GROUNDSPEED_M_S='${PLANE2_ROUTE_GROUNDSPEED_M_S}'"
+  sleep "${PLANE2_ROUTE_LEG_DWELL_SEC}"
+
+  run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" 'do_reposition' "${PLANE2_SYS_ID}" "${PLANE2_ROUTE_POINT2_LOG}" "    export PX4_TARGET_OFFSET_NORTH_M='${PLANE2_ROUTE_POINT2_NORTH_M}'
+    export PX4_TARGET_OFFSET_EAST_M='${PLANE2_ROUTE_POINT2_EAST_M}'
+    export PX4_TARGET_OFFSET_ALT_M='${PLANE2_ROUTE_POINT_ALT_M}'
+    export PX4_LOITER_RADIUS_M='${PLANE2_ROUTE_LOITER_RADIUS_M}'
+    export PX4_GROUNDSPEED_M_S='${PLANE2_ROUTE_GROUNDSPEED_M_S}'"
+  sleep "${PLANE2_ROUTE_LEG_DWELL_SEC}"
+
+  run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" 'do_reposition' "${PLANE2_SYS_ID}" "${PLANE2_ROUTE_POINT3_LOG}" "    export PX4_TARGET_OFFSET_NORTH_M='${PLANE2_ROUTE_POINT3_NORTH_M}'
+    export PX4_TARGET_OFFSET_EAST_M='${PLANE2_ROUTE_POINT3_EAST_M}'
+    export PX4_TARGET_OFFSET_ALT_M='${PLANE2_ROUTE_POINT_ALT_M}'
+    export PX4_LOITER_RADIUS_M='${PLANE2_ROUTE_LOITER_RADIUS_M}'
+    export PX4_GROUNDSPEED_M_S='${PLANE2_ROUTE_GROUNDSPEED_M_S}'"
+  sleep "${PLANE2_ROUTE_LEG_DWELL_SEC}"
+
+  run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" 'do_reposition' "${PLANE2_SYS_ID}" "${PLANE2_ROUTE_POINT4_LOG}" "    export PX4_TARGET_OFFSET_NORTH_M='${PLANE2_ROUTE_POINT4_NORTH_M}'
+    export PX4_TARGET_OFFSET_EAST_M='${PLANE2_ROUTE_POINT4_EAST_M}'
+    export PX4_TARGET_OFFSET_ALT_M='${PLANE2_ROUTE_POINT_ALT_M}'
+    export PX4_LOITER_RADIUS_M='${PLANE2_ROUTE_LOITER_RADIUS_M}'
+    export PX4_GROUNDSPEED_M_S='${PLANE2_ROUTE_GROUNDSPEED_M_S}'"
 }
 
 run_local_position_waiter() {
@@ -465,8 +500,18 @@ LAND_NAV_STATE="${PX4_EXPECTED_LAND_NAV_STATE:-18}"
 LAND_MIN_DELTA_Z="${PX4_EXPECTED_LAND_MIN_DELTA_Z:-10.0}"
 LAND_DETECTED_TIMEOUT_SEC="${PX4_LAND_DETECTED_TIMEOUT_SEC:-120}"
 CATCH_MIN_ALTITUDE_M="${PHASE6_CATCH_MIN_ALTITUDE_M:-10.0}"
-PLANE2_REPOSITION_NORTH_M="${PHASE6_LIVE_RIVAL_OFFSET_NORTH_M:-120.0}"
-PLANE2_REPOSITION_EAST_M="${PHASE6_LIVE_RIVAL_OFFSET_EAST_M:-60.0}"
+PLANE2_ROUTE_POINT1_NORTH_M="${PHASE6_LIVE_RIVAL_RECT_POINT1_NORTH_M:-80.0}"
+PLANE2_ROUTE_POINT1_EAST_M="${PHASE6_LIVE_RIVAL_RECT_POINT1_EAST_M:-0.0}"
+PLANE2_ROUTE_POINT2_NORTH_M="${PHASE6_LIVE_RIVAL_RECT_POINT2_NORTH_M:-0.0}"
+PLANE2_ROUTE_POINT2_EAST_M="${PHASE6_LIVE_RIVAL_RECT_POINT2_EAST_M:-80.0}"
+PLANE2_ROUTE_POINT3_NORTH_M="${PHASE6_LIVE_RIVAL_RECT_POINT3_NORTH_M:--80.0}"
+PLANE2_ROUTE_POINT3_EAST_M="${PHASE6_LIVE_RIVAL_RECT_POINT3_EAST_M:-0.0}"
+PLANE2_ROUTE_POINT4_NORTH_M="${PHASE6_LIVE_RIVAL_RECT_POINT4_NORTH_M:-0.0}"
+PLANE2_ROUTE_POINT4_EAST_M="${PHASE6_LIVE_RIVAL_RECT_POINT4_EAST_M:--80.0}"
+PLANE2_ROUTE_POINT_ALT_M="${PHASE6_LIVE_RIVAL_RECT_POINT_ALT_M:-0.0}"
+PLANE2_ROUTE_LEG_DWELL_SEC="${PHASE6_LIVE_RIVAL_RECT_LEG_DWELL_SEC:-8}"
+PLANE2_ROUTE_LOITER_RADIUS_M="${PHASE6_LIVE_RIVAL_RECT_LOITER_RADIUS_M:-60.0}"
+PLANE2_ROUTE_GROUNDSPEED_M_S="${PHASE6_LIVE_RIVAL_RECT_GROUNDSPEED_M_S:-20.0}"
 CUE_THRUST_X="${PHASE6_CUE_THRUST_X:-0.66}"
 CUE_ROLL_ANGLE_GAIN="${PHASE6_CUE_ROLL_ANGLE_GAIN:-0.80}"
 CUE_MAX_ROLL_DEG="${PHASE6_CUE_MAX_ROLL_DEG:-35.0}"
@@ -499,6 +544,7 @@ echo "  - plane_01 and plane_02 start in the shared phase-4 runtime"
 echo "  - both aircraft take off and stabilize"
 echo "  - plane_02 publishes live rival state into /competition/rival/state"
 echo "  - plane_01 runs the maintained phase-6 cueing path against the real plane_02 target"
+echo "  - plane_02 flies a minimal four-corner rectangular route"
 echo "  - recorded ownship-versus-rival geometry shows a sustained airborne catch in the forward cone"
 echo "  - after cueing, both aircraft must complete a successful landing"
 echo
@@ -628,10 +674,9 @@ ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source 
 MONITOR_PID=$!
 wait_for_topics "" 30
 
-echo "step 13: sending a bounded live-rival reposition to plane_02"
-run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" 'do_reposition' "${PLANE2_SYS_ID}" "${PLANE2_REPOSITION_LOG}" "    export PX4_TARGET_OFFSET_NORTH_M='${PLANE2_REPOSITION_NORTH_M}'
-    export PX4_TARGET_OFFSET_EAST_M='${PLANE2_REPOSITION_EAST_M}'
-    export PX4_TARGET_OFFSET_ALT_M='0.0'"
+echo "step 13: starting the live-rival rectangular route on plane_02"
+run_live_rival_rectangle_route >"${PLANE2_REPOSITION_LOG}" 2>&1 &
+RIVAL_ROUTE_PID=$!
 echo "step 14: sampling the initial cue error"
 INITIAL_CUE_ERROR="$(read_cue_error)"
 if [[ -z "${INITIAL_CUE_ERROR}" ]]; then
@@ -688,6 +733,8 @@ stop_pid "${RIVAL_ADAPTER_PID}"
 RIVAL_ADAPTER_PID=""
 stop_pid "${OWNSHIP_ADAPTER_PID}"
 OWNSHIP_ADAPTER_PID=""
+stop_pid "${RIVAL_ROUTE_PID}"
+RIVAL_ROUTE_PID=""
 run_navigation_command "${PLANE1_NAMESPACE}" "${PLANE1_COMMAND_TOPIC}" "${PLANE1_ACK_TOPIC}" "${PLANE1_GLOBAL_POSITION_TOPIC}" 'nav_land' "${PLANE1_SYS_ID}" "${PLANE1_LAND_LOG}" ''
 run_status_waiter "${PLANE1_NAMESPACE}" "${PLANE1_STATUS_TOPIC}" "${PLANE1_STATUS_LOG}" "${STATUS_TIMEOUT_SEC}" '' "${LAND_NAV_STATE}" ''
 run_land_detected_waiter "${PLANE1_NAMESPACE}" "/${PLANE1_NAMESPACE}/fmu/out/vehicle_land_detected" "${PLANE1_LAND_DETECTED_LOG}" "${LAND_DETECTED_TIMEOUT_SEC}" 'true'
