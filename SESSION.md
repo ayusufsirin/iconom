@@ -1,20 +1,19 @@
 # SESSION
 
 ## Goal
-Maintain the optimized phase-6 acceptance path as the current baseline for pursuit guidance and live-rival cueing.
+Stabilize the phase-6 live-rival cueing slice using PX4-supported offboard attitude setpoints so a real airborne catch is followed by successful landing of both aircraft.
 
 ## Current status
-`perf(phase6): reuse guidance workspace in acceptance` is committed at `bc69642`. `scripts/phase6-acceptance.sh` now bootstraps `px4_msgs` and `iconom_guidance` once, reuses that workspace across the first three checks, and still passes in both headless and GUI modes.
+The live-rival cueing path now uses `OffboardControlMode.attitude=true` plus `VehicleAttitudeSetpoint` instead of raw body-rate setpoints. `ownship_telemetry_adapter.py` publishes ownship state on PX4 local-position cadence, and `check-phase6-live-rival-cueing.sh` now requires a sustained airborne catch before landing both aircraft. The revised headless live-rival cueing check now passes end to end.
 
 ## Files touched
-- /home/joseph/Projects/iconom/scripts/check-phase6-target-selection.sh
-- /home/joseph/Projects/iconom/scripts/check-phase6-intercept-planner.sh
-- /home/joseph/Projects/iconom/scripts/check-phase6-pursuit-state-machine.sh
-- /home/joseph/Projects/iconom/scripts/phase6-acceptance.sh
+- /home/joseph/Projects/iconom/ros2_ws/src/iconom_competition/iconom_competition/ownship_telemetry_adapter.py
+- /home/joseph/Projects/iconom/ros2_ws/src/iconom_guidance/iconom_guidance/camera_cueing_bridge.py
+- /home/joseph/Projects/iconom/scripts/check-phase6-live-rival-cueing.sh
 - /home/joseph/Projects/iconom/SESSION.md
 
 ## Last completed step
-Committed the optimized phase-6 acceptance slice after validating both `--headless` and `--gui`.
+Reworked the cueing bridge to use PX4 attitude setpoints, reran `./scripts/check-phase6-live-rival-cueing.sh`, and got a truthful green run with airborne catch and post-catch landing of both aircraft.
 
 ## Current blocker
 None
@@ -25,16 +24,10 @@ None
 ## Validation
 ```bash
 cd /home/joseph/Projects/iconom
-./scripts/phase6-acceptance.sh --headless
-```
-
-```bash
-cd /home/joseph/Projects/iconom
-xhost +local:docker
-./scripts/phase6-acceptance.sh --gui
+./scripts/check-phase6-live-rival-cueing.sh
 ```
 
 ## Notes
-- The first cold acceptance run still bootstraps `px4_msgs` once; the first three checks now reuse that prepared workspace instead of rebuilding it three times.
-- GUI mode is only visually meaningful for the final live-rival cueing step; the earlier phase-6 checks remain non-visual.
 - Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, and `opencode.json.home_network` out of git.
+- Phase-6 live-rival cueing now depends on PX4 attitude setpoints, not repo-owned raw rate setpoints.
+- The acceptance is intentionally strict: success requires a sustained airborne catch before both aircraft land.

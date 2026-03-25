@@ -86,6 +86,9 @@ class OwnshipTelemetryAdapter(Node):
             "y": float(msg.vy),
             "z": float(msg.vz),
         }
+        # Guidance needs fresh ownship state; keep this on the PX4 local-position cadence
+        # even though server telemetry remains deliberately slower.
+        self._publish_ownship_state()
 
     def _compute_heading(self):
         if self.latest_velocity:
@@ -156,7 +159,6 @@ class OwnshipTelemetryAdapter(Node):
     def _start_telemetry_loop(self):
         def loop():
             while rclpy.ok():
-                self._publish_ownship_state()
                 self._send_telemetry()
                 time.sleep(TELEMETRY_INTERVAL)
         

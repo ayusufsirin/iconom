@@ -5,7 +5,7 @@ from typing import Optional
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
-from px4_msgs.msg import OffboardControlMode, VehicleRatesSetpoint
+from px4_msgs.msg import OffboardControlMode, VehicleAttitudeSetpoint
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Float32, String
@@ -30,6 +30,21 @@ def clamp(value: float, lower: float, upper: float) -> float:
     return max(lower, min(upper, value))
 
 
+def quaternion_from_euler(roll: float, pitch: float, yaw: float) -> list[float]:
+    cr = math.cos(roll * 0.5)
+    sr = math.sin(roll * 0.5)
+    cp = math.cos(pitch * 0.5)
+    sp = math.sin(pitch * 0.5)
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+
+    w = cr * cp * cy + sr * sp * sy
+    x = sr * cp * cy - cr * sp * sy
+    y = cr * sp * cy + sr * cp * sy
+    z = cr * cp * sy - sr * sp * cy
+    return [w, x, y, z]
+
+
 class CameraCueingBridge(Node):
     def __init__(self) -> None:
         super().__init__("camera_cueing_bridge")
@@ -37,25 +52,29 @@ class CameraCueingBridge(Node):
         self.declare_parameter("vehicle_namespace", "plane_01")
         self.declare_parameter("publish_rate_hz", 20.0)
         self.declare_parameter("thrust_x", 0.72)
-        self.declare_parameter("roll_rate_gain", 1.2)
-        self.declare_parameter("max_roll_rate", 1.0)
-        self.declare_parameter("yaw_rate_gain", 0.35)
-        self.declare_parameter("max_yaw_rate", 0.4)
-        self.declare_parameter("pitch_rate", 0.0)
+        self.declare_parameter("roll_angle_gain", 0.8)
+        self.declare_parameter("max_roll_deg", 35.0)
+        self.declare_parameter("pitch_angle_deg", 2.0)
+        self.declare_parameter("pitch_angle_gain", 0.0)
+        self.declare_parameter("max_pitch_deg", 12.0)
+        self.declare_parameter("altitude_error_deadband_m", 2.0)
         self.declare_parameter("selected_timeout_sec", 6.0)
+        self.declare_parameter("capture_error_deg", 20.0)
 
         namespace = str(self.get_parameter("vehicle_namespace").value)
         self.publish_rate_hz = float(self.get_parameter("publish_rate_hz").value)
         self.thrust_x = float(self.get_parameter("thrust_x").value)
-        self.roll_rate_gain = float(self.get_parameter("roll_rate_gain").value)
-        self.max_roll_rate = float(self.get_parameter("max_roll_rate").value)
-        self.yaw_rate_gain = float(self.get_parameter("yaw_rate_gain").value)
-        self.max_yaw_rate = float(self.get_parameter("max_yaw_rate").value)
-        self.pitch_rate = float(self.get_parameter("pitch_rate").value)
+        self.roll_angle_gain = float(self.get_parameter("roll_angle_gain").value)
+        self.max_roll_rad = math.radians(float(self.get_parameter("max_roll_deg").value))
+        self.base_pitch_rad = math.radians(float(self.get_parameter("pitch_angle_deg").value))
+        self.pitch_angle_gain = float(self.get_parameter("pitch_angle_gain").value)
+        self.max_pitch_rad = math.radians(float(self.get_parameter("max_pitch_deg").value))
+        self.altitude_error_deadband_m = float(self.get_parameter("altitude_error_deadband_m").value)
         self.selected_timeout_sec = float(self.get_parameter("selected_timeout_sec").value)
+        self.capture_error_deg = float(self.get_parameter("capture_error_deg").value)
 
         self.offboard_topic = f"/{namespace}/fmu/in/offboard_control_mode"
-        self.rates_topic = f"/{namespace}/fmu/in/vehicle_rates_setpoint"
+        self.attitude_topic = f"/{namespace}/fmu/in/vehicle_attitude_setpoint"
 
         self.ownship_state: Optional[PoseStamped] = None
         self.selected_target: Optional[PoseStamped] = None
@@ -70,7 +89,7 @@ class CameraCueingBridge(Node):
         )
 
         self.offboard_pub = self.create_publisher(OffboardControlMode, self.offboard_topic, qos_profile)
-        self.rates_pub = self.create_publisher(VehicleRatesSetpoint, self.rates_topic, qos_profile)
+        self.attitude_pub = self.create_publisher(VehicleAttitudeSetpoint, self.attitude_topic, qos_profile)
         self.cue_error_pub = self.create_publisher(Float32, CAMERA_CUE_ERROR_TOPIC, 10)
         self.create_subscription(PoseStamped, OWNSHIP_STATE_TOPIC, self._handle_ownship_state, 10)
         self.create_subscription(PoseStamped, SELECTED_TARGET_TOPIC, self._handle_selected_target, 10)
@@ -79,7 +98,7 @@ class CameraCueingBridge(Node):
 
         self.get_logger().info(
             f"camera cueing bridge listening on {OWNSHIP_STATE_TOPIC}, {SELECTED_TARGET_TOPIC}, and {PURSUIT_STATE_TOPIC}; "
-            f"publishing cue error on {CAMERA_CUE_ERROR_TOPIC} and offboard setpoints on {self.offboard_topic} / {self.rates_topic}"
+            f"publishing cue error on {CAMERA_CUE_ERROR_TOPIC} and offboard setpoints on {self.offboard_topic} / {self.attitude_topic}"
         )
 
     def _now(self) -> float:
@@ -127,6 +146,20 @@ class CameraCueingBridge(Node):
         msg.data = float(abs(math.degrees(error_rad)))
         self.cue_error_pub.publish(msg)
 
+    def _compute_pitch_angle(self) -> float:
+        if self.ownship_state is None or not self._target_fresh() or self.selected_target is None:
+            return self.base_pitch_rad
+
+        own_z = float(self.ownship_state.pose.position.z)
+        target_z = float(self.selected_target.pose.position.z)
+        # PX4 local z is NED: more negative means higher altitude.
+        altitude_error = own_z - target_z
+        if abs(altitude_error) <= self.altitude_error_deadband_m:
+            return self.base_pitch_rad
+
+        commanded_pitch = self.base_pitch_rad + self.pitch_angle_gain * altitude_error
+        return clamp(commanded_pitch, -self.max_pitch_rad, self.max_pitch_rad)
+
     def _publish_offboard_setpoint(self, error_rad: float) -> None:
         if self.pursuit_state != STATE_PURSUE:
             return
@@ -136,27 +169,47 @@ class CameraCueingBridge(Node):
         offboard.position = False
         offboard.velocity = False
         offboard.acceleration = False
-        offboard.attitude = False
-        offboard.body_rate = True
+        offboard.attitude = True
+        offboard.body_rate = False
         offboard.thrust_and_torque = False
         offboard.direct_actuator = False
         self.offboard_pub.publish(offboard)
 
-        rates = VehicleRatesSetpoint()
-        rates.timestamp = self.get_clock().now().nanoseconds // 1000
-        rates.roll = clamp(self.roll_rate_gain * error_rad, -self.max_roll_rate, self.max_roll_rate)
-        rates.pitch = self.pitch_rate
-        rates.yaw = clamp(self.yaw_rate_gain * error_rad, -self.max_yaw_rate, self.max_yaw_rate)
-        rates.thrust_body = [self.thrust_x, 0.0, 0.0]
-        rates.reset_integral = False
-        self.rates_pub.publish(rates)
+        cue_error_deg = abs(math.degrees(error_rad))
+        if cue_error_deg <= self.capture_error_deg:
+            desired_roll = 0.0
+        else:
+            desired_roll = clamp(
+                self.roll_angle_gain * error_rad,
+                -self.max_roll_rad,
+                self.max_roll_rad,
+            )
+
+        desired_pitch = self._compute_pitch_angle()
+        desired_yaw = 0.0
+        if self.ownship_state is not None:
+            own_heading = yaw_from_quaternion(
+                self.ownship_state.pose.orientation.z,
+                self.ownship_state.pose.orientation.w,
+            )
+            desired_yaw = wrap_angle(own_heading + error_rad)
+
+        attitude = VehicleAttitudeSetpoint()
+        attitude.timestamp = self.get_clock().now().nanoseconds // 1000
+        attitude.q_d = quaternion_from_euler(desired_roll, desired_pitch, desired_yaw)
+        attitude.yaw_sp_move_rate = 0.0
+        attitude.thrust_body = [self.thrust_x, 0.0, 0.0]
+        attitude.reset_integral = False
+        attitude.fw_control_yaw_wheel = False
+        self.attitude_pub.publish(attitude)
 
         now = self._now()
         if (now - self.last_log_at) >= 2.0:
             self.last_log_at = now
             self.get_logger().info(
-                f"published cueing offboard setpoint with cue_error_deg={abs(math.degrees(error_rad)):.1f} "
-                f"roll_rate={rates.roll:.2f} yaw_rate={rates.yaw:.2f} thrust_x={self.thrust_x:.2f}"
+                f"published cueing offboard setpoint with cue_error_deg={cue_error_deg:.1f} "
+                f"roll_deg={math.degrees(desired_roll):.1f} pitch_deg={math.degrees(desired_pitch):.1f} "
+                f"yaw_deg={math.degrees(desired_yaw):.1f} thrust_x={self.thrust_x:.2f}"
             )
 
     def _tick(self) -> None:
