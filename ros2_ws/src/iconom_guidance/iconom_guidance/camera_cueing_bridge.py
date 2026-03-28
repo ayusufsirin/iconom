@@ -58,6 +58,8 @@ class CameraCueingBridge(Node):
         self.declare_parameter("thrust_x", 0.72)
         self.declare_parameter("min_thrust_x", 0.36)
         self.declare_parameter("range_thrust_gain", 0.02)
+        self.declare_parameter("range_damping_gain", 0.06)
+        self.declare_parameter("closing_speed_filter_alpha", 0.35)
         self.declare_parameter("target_chase_range_m", 5.0)
         self.declare_parameter("chase_range_tolerance_m", 5.0)
         self.declare_parameter("capture_chase_range_m", 20.0)
@@ -78,6 +80,8 @@ class CameraCueingBridge(Node):
         self.max_thrust_x = float(self.get_parameter("thrust_x").value)
         self.min_thrust_x = float(self.get_parameter("min_thrust_x").value)
         self.range_thrust_gain = float(self.get_parameter("range_thrust_gain").value)
+        self.range_damping_gain = float(self.get_parameter("range_damping_gain").value)
+        self.closing_speed_filter_alpha = float(self.get_parameter("closing_speed_filter_alpha").value)
         self.target_chase_range_m = float(self.get_parameter("target_chase_range_m").value)
         self.chase_range_tolerance_m = float(self.get_parameter("chase_range_tolerance_m").value)
         self.capture_chase_range_m = float(self.get_parameter("capture_chase_range_m").value)
@@ -101,6 +105,9 @@ class CameraCueingBridge(Node):
         self.selected_target_at: Optional[float] = None
         self.pursuit_state = "idle"
         self.last_log_at = 0.0
+        self.previous_range_to_target_m: Optional[float] = None
+        self.previous_range_sample_at: Optional[float] = None
+        self.filtered_closing_speed_mps = 0.0
 
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -124,6 +131,11 @@ class CameraCueingBridge(Node):
     def _now(self) -> float:
         return time.monotonic()
 
+    def _reset_range_controller(self) -> None:
+        self.previous_range_to_target_m = None
+        self.previous_range_sample_at = None
+        self.filtered_closing_speed_mps = 0.0
+
     def _handle_ownship_state(self, msg: PoseStamped) -> None:
         self.ownship_state = msg
 
@@ -133,6 +145,8 @@ class CameraCueingBridge(Node):
 
     def _handle_pursuit_state(self, msg: String) -> None:
         self.pursuit_state = msg.data.strip().lower()
+        if self.pursuit_state != STATE_PURSUE:
+            self._reset_range_controller()
 
     def _target_fresh(self) -> bool:
         return (
@@ -179,10 +193,12 @@ class CameraCueingBridge(Node):
             and heading_alignment_error_deg <= self.capture_heading_alignment_max_deg
         )
 
-    def _active_chase_range_m(self) -> float:
-        if self._tail_chase_ready():
-            return self.target_chase_range_m
-        return self.capture_chase_range_m
+    def _active_chase_range_m(self, range_to_target_m: Optional[float] = None) -> float:
+        if not self._tail_chase_ready():
+            return self.capture_chase_range_m
+        if range_to_target_m is not None and range_to_target_m > (self.target_chase_range_m + self.chase_range_tolerance_m):
+            return max(self.target_chase_range_m + self.chase_range_tolerance_m, self.capture_chase_range_m * 0.5)
+        return self.target_chase_range_m
 
     def _trailing_slot_position(self) -> Optional[tuple[float, float, float]]:
         if not self._target_fresh() or self.selected_target is None:
@@ -192,7 +208,7 @@ class CameraCueingBridge(Node):
         if target_heading is None:
             return None
 
-        active_range = self._active_chase_range_m()
+        active_range = self._active_chase_range_m(self._current_target_range_3d_m())
         slot_x = target.x - math.cos(target_heading) * active_range
         slot_y = target.y - math.sin(target_heading) * active_range
         slot_z = target.z
@@ -207,6 +223,28 @@ class CameraCueingBridge(Node):
         dy = float(target.y - own.y)
         dz = float(target.z - own.z)
         return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    def _estimate_closing_speed_mps(self, range_to_target_m: Optional[float]) -> float:
+        if range_to_target_m is None:
+            self._reset_range_controller()
+            return 0.0
+
+        now = self._now()
+        if self.previous_range_to_target_m is None or self.previous_range_sample_at is None:
+            self.previous_range_to_target_m = range_to_target_m
+            self.previous_range_sample_at = now
+            self.filtered_closing_speed_mps = 0.0
+            return 0.0
+
+        dt = max(1e-3, now - self.previous_range_sample_at)
+        raw_closing_speed_mps = max(0.0, (self.previous_range_to_target_m - range_to_target_m) / dt)
+        alpha = clamp(self.closing_speed_filter_alpha, 0.0, 1.0)
+        self.filtered_closing_speed_mps = (
+            (1.0 - alpha) * self.filtered_closing_speed_mps + alpha * raw_closing_speed_mps
+        )
+        self.previous_range_to_target_m = range_to_target_m
+        self.previous_range_sample_at = now
+        return self.filtered_closing_speed_mps
 
     def _signed_heading_error_rad(self) -> Optional[float]:
         if self.ownship_state is None:
@@ -250,21 +288,26 @@ class CameraCueingBridge(Node):
         commanded_pitch = self.base_pitch_rad + self.pitch_angle_gain * altitude_error
         return clamp(commanded_pitch, -self.max_pitch_rad, self.max_pitch_rad)
 
-    def _compute_thrust_x(self, range_to_target_m: Optional[float]) -> float:
+    def _compute_thrust_x(self, range_to_target_m: Optional[float]) -> tuple[float, float]:
         if range_to_target_m is None:
-            return self.max_thrust_x
+            self._reset_range_controller()
+            return self.max_thrust_x, 0.0
 
-        active_range = self._active_chase_range_m()
         in_tail_chase = self._tail_chase_ready()
+        active_range = self._active_chase_range_m(range_to_target_m)
+        closing_speed_mps = self._estimate_closing_speed_mps(range_to_target_m)
+
         if in_tail_chase and range_to_target_m <= (self.target_chase_range_m + self.chase_range_tolerance_m):
-            return self.min_thrust_x
+            return self.min_thrust_x, closing_speed_mps
 
         range_error = range_to_target_m - active_range
         if in_tail_chase and range_to_target_m <= (self.target_chase_range_m + 2.0 * self.chase_range_tolerance_m):
-            commanded = self.min_thrust_x + 0.5 * self.range_thrust_gain * range_error
+            proportional_term = 0.5 * self.range_thrust_gain * range_error
         else:
-            commanded = self.min_thrust_x + self.range_thrust_gain * range_error
-        return clamp(commanded, self.min_thrust_x, self.max_thrust_x)
+            proportional_term = self.range_thrust_gain * range_error
+
+        commanded = self.min_thrust_x + proportional_term - self.range_damping_gain * closing_speed_mps
+        return clamp(commanded, self.min_thrust_x, self.max_thrust_x), closing_speed_mps
 
     def _publish_offboard_setpoint(self, error_rad: float) -> None:
         if self.pursuit_state != STATE_PURSUE:
@@ -285,7 +328,7 @@ class CameraCueingBridge(Node):
         range_to_target_m = self._current_target_range_3d_m()
         tail_angle_deg, heading_alignment_error_deg = self._current_chase_geometry()
         in_tail_chase = self._tail_chase_ready()
-        active_range = self._active_chase_range_m()
+        active_range = self._active_chase_range_m(range_to_target_m)
         near_hold_band = (
             in_tail_chase
             and range_to_target_m is not None
@@ -315,11 +358,13 @@ class CameraCueingBridge(Node):
             else:
                 desired_yaw = wrap_angle(own_heading + error_rad)
 
+        thrust_x, closing_speed_mps = self._compute_thrust_x(range_to_target_m)
+
         attitude = VehicleAttitudeSetpoint()
         attitude.timestamp = self.get_clock().now().nanoseconds // 1000
         attitude.q_d = quaternion_from_euler(desired_roll, desired_pitch, desired_yaw)
         attitude.yaw_sp_move_rate = 0.0
-        attitude.thrust_body = [self._compute_thrust_x(range_to_target_m), 0.0, 0.0]
+        attitude.thrust_body = [thrust_x, 0.0, 0.0]
         attitude.reset_integral = False
         attitude.fw_control_yaw_wheel = False
         self.attitude_pub.publish(attitude)
@@ -327,7 +372,6 @@ class CameraCueingBridge(Node):
         now = self._now()
         if (now - self.last_log_at) >= 2.0:
             self.last_log_at = now
-            thrust_x = attitude.thrust_body[0]
             range_text = f" range_m={range_to_target_m:.1f}" if range_to_target_m is not None else ""
             geometry_text = ""
             if tail_angle_deg is not None and heading_alignment_error_deg is not None:
@@ -335,6 +379,7 @@ class CameraCueingBridge(Node):
                     f" tail_angle_deg={tail_angle_deg:.1f}"
                     f" heading_alignment_deg={heading_alignment_error_deg:.1f}"
                     f" active_range_m={active_range:.1f}"
+                    f" closing_speed_mps={closing_speed_mps:.2f}"
                 )
             self.get_logger().info(
                 f"published trailing-slot cueing setpoint with cue_error_deg={cue_error_deg:.1f}"
@@ -345,8 +390,10 @@ class CameraCueingBridge(Node):
     def _tick(self) -> None:
         error_rad = self._signed_heading_error_rad()
         self._publish_cue_error(error_rad)
-        if error_rad is not None:
-            self._publish_offboard_setpoint(error_rad)
+        if error_rad is None:
+            self._reset_range_controller()
+            return
+        self._publish_offboard_setpoint(error_rad)
 
 
 def main(args=None) -> None:
