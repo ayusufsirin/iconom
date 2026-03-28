@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-rosdep \
     python3-vcstool \
     python3-pip \
+    ros-humble-rqt-image-view \
     ros-humble-ros-base \
  && rm -rf /var/lib/apt/lists/*
 

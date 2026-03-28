@@ -1,40 +1,45 @@
 # SESSION
 
 ## Goal
-Stabilize the phase-6 live-rival chase with closing-speed damping so `plane_01` can hold a sustained rear-aspect follow distance behind `plane_02` instead of overshooting through the target path.
+Add a docker-side camera-view helper so the ownship camera feed can be inspected while the phase-6 GUI sim is running.
 
 ## Current status
-The repo now has a PD-style range controller in `camera_cueing_bridge.py` that adds closing-speed damping on top of the staged trailing-slot geometry. The latest live-rival run completed and produced fresh CSV/CZML artifacts, but the strengthened geometry check still did not satisfy the required sustained `5 m +/- tolerance` stern-chase hold.
+The repo already exposes `/plane_01/camera/image_raw` and `/plane_02/camera/image_raw`, but `ros2_app` did not have GUI image-view tooling or X11 wiring. This slice adds `rqt_image_view` to the `ros2_app` image, routes X11 into that service in the local override stack, and adds a helper script to open the ownship feed from inside the running container.
 
 ## Files touched
-- /home/joseph/Projects/iconom/ros2_ws/src/iconom_guidance/iconom_guidance/camera_cueing_bridge.py
+- /home/joseph/Projects/iconom/docker/ros2_app/Dockerfile
+- /home/joseph/Projects/iconom/docker-compose.override.yml
+- /home/joseph/Projects/iconom/scripts/view-phase6-ownship-camera.sh
+- /home/joseph/Projects/iconom/README.md
 - /home/joseph/Projects/iconom/SESSION.md
 
 ## Last completed step
-Ran the live two-plane simulation with the new PD controller and regenerated `/home/joseph/Projects/iconom/ros2_ws/.tmp-phase6-live-rival-geometry.csv.czml` from the resulting CSV.
+Patched the repo for docker-side camera viewing: package install, X11 wiring, and a maintained helper script.
 
 ## Current blocker
-The current PD gains still do not hold simultaneous cue, rear-cone geometry, and `5 m +/- tolerance` range for the required sustained 10-second window.
+Runtime validation is still pending against a rebuilt `ros2_app` image.
 
 ## Next exact step
-Tune `range_damping_gain` and `closing_speed_filter_alpha` in `/home/joseph/Projects/iconom/ros2_ws/src/iconom_guidance/iconom_guidance/camera_cueing_bridge.py`, then rerun `./scripts/check-phase6-live-rival-geometry.sh --incremental` and inspect the regenerated CZML.
+Rebuild `ros2_app`, then run `/home/joseph/Projects/iconom/scripts/view-phase6-ownship-camera.sh` while the GUI sim is active and confirm that `rqt_image_view` opens `/plane_01/camera/image_raw`.
 
 ## Validation
 ```bash
 cd /home/joseph/Projects/iconom
-./scripts/check-phase6-live-rival-geometry.sh --incremental
+bash -n ./scripts/view-phase6-ownship-camera.sh
 ```
 
 ```bash
 cd /home/joseph/Projects/iconom
-python3 ./scripts/export-phase6-czml.py ./ros2_ws/.tmp-phase6-live-rival-geometry.csv
+docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.override.yml build ros2_app
 ```
 
 ```bash
 cd /home/joseph/Projects/iconom
-./scripts/serve-phase6-czml-viewer.sh
+xhost +local:docker
+ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-geometry.sh --incremental
+./scripts/view-phase6-ownship-camera.sh
 ```
 
 ## Notes
 - Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, `opencode.json.home_network`, and the `.tmp-phase6-*.csv` / `.svg` / `.czml` artifacts out of git.
-- The freshest replay artifact is `/home/joseph/Projects/iconom/ros2_ws/.tmp-phase6-live-rival-geometry.csv.czml`.
+- Override the viewed topic with `CAMERA_TOPIC=/plane_02/camera/image_raw` for the rival camera.

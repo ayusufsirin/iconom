@@ -462,6 +462,15 @@ ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-geometry.sh --
 
 This standalone check is not part of `phase6-acceptance.sh` yet. It exists to harden the meaning of live-rival cueing with recorded route-comparison evidence before phase 7 visual-lock work.
 
+To view the ownship camera feed from inside the running `ros2_app` container while the GUI sim is active:
+
+```bash
+xhost +local:docker
+./scripts/view-phase6-ownship-camera.sh
+```
+
+The helper defaults to `/plane_01/camera/image_raw`. Override the topic with `CAMERA_TOPIC=/plane_02/camera/image_raw` if you want the rival feed instead.
+
 ## Phase 6 Scripted Cue Geometry Hardening
 
 The live-rival cueing slice is the maintained phase-6 baseline, but there is also a standalone hardening check for route-comparison evidence against a deterministic moving scripted rival. It keeps `plane_01` as the real simulated ownship, records ownship-versus-rival geometry to CSV, and only passes if a sustained forward-cone catch occurs while `plane_01` is still airborne, shows meaningful range closure and final proximity to the rival, and then lands cleanly afterward.

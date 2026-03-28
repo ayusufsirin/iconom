@@ -22,8 +22,13 @@ services:
   ros2_app:
     stdin_open: true
     tty: true
+    environment:
+      DISPLAY: ${DISPLAY:-}
+      QT_X11_NO_MITSHM: "1"
+      XDG_RUNTIME_DIR: /tmp/runtime-root
     volumes:
       - ./ros2_ws:/workspaces/ros2_ws
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
 
   dev_tools:
     image: alpine:3.20
