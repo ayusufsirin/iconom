@@ -1,38 +1,40 @@
 # SESSION
 
 ## Goal
-Keep phase-6 hardening truthful by validating live two-aircraft cueing as a sustained stern-chase geometry, not just a transient forward-cone catch.
+Make the local phase-6 Cesium viewer stable so exported CZML replays can be inspected in a browser by path load or drag-drop.
 
 ## Current status
-The shared evaluator now scores angular, range, tail-angle, and heading-alignment gates. The maintained live-rival geometry check uses a straight `plane_02` run and passes with a roughly 10-second stern-chase hold before both aircraft land.
+The repo has a standalone CZML exporter and a local browser viewer. The viewer initialization was corrected to use `terrainProvider` instead of the unsupported `terrain`/`baseLayer` combination that was crashing Cesium on load.
 
 ## Files touched
-- /home/joseph/Projects/iconom/scripts/evaluate-phase6-geometry.py
-- /home/joseph/Projects/iconom/scripts/check-phase6-live-rival-geometry.sh
+- /home/joseph/Projects/iconom/scripts/export-phase6-czml.py
+- /home/joseph/Projects/iconom/scripts/serve-phase6-czml-viewer.sh
+- /home/joseph/Projects/iconom/docs/phase6-czml-viewer.html
 - /home/joseph/Projects/iconom/README.md
 - /home/joseph/Projects/iconom/SESSION.md
 
 ## Last completed step
-Validated `./scripts/check-phase6-live-rival-geometry.sh --incremental` with the new stern-chase gates. The passing run reported `hold_duration_sec=9.996`, `catch_tail_angle_deg=9.137`, `catch_heading_alignment_error_deg=5.677`, `catch_range_3d_m=22.224`, and clean landing for both aircraft.
+Fixed the viewer bootstrap crash reported in the browser by switching the Cesium viewer initialization to the stable `terrainProvider` option.
 
 ## Current blocker
 None
 
 ## Next exact step
-None
+Open `http://127.0.0.1:8765/docs/phase6-czml-viewer.html` again and verify the page loads, then load `/ros2_ws/.tmp-phase6-live-rival-geometry.csv.czml`.
 
 ## Validation
 ```bash
 cd /home/joseph/Projects/iconom
-./scripts/check-phase6-live-rival-geometry.sh --incremental
+python3 ./scripts/export-phase6-czml.py ./ros2_ws/.tmp-phase6-live-rival-geometry.csv
 ```
 
 ```bash
 cd /home/joseph/Projects/iconom
-docker compose -f docker-compose.yml run --rm -v /home/joseph/Projects/iconom:/repo ros2_app python3 /repo/scripts/plot-phase6-scripted-cue-geometry.py /repo/ros2_ws/.tmp-phase6-live-rival-geometry.csv --output /repo/ros2_ws/.tmp-phase6-live-rival-geometry.csv.svg
+./scripts/serve-phase6-czml-viewer.sh
 ```
 
 ## Notes
-- The live-rival check now uses a straight `plane_02` route by default because the old rectangle did not sustain a tail-chase hold.
-- `hold_duration_sec` is sample-based; the maintained passing run printed `9.996`, which satisfies the 10-second window under the evaluator’s sample-period logic.
-- Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, `opencode.json.home_network`, and the `.tmp-phase6-*.csv` / `.svg` artifacts out of git.
+- The CZML exporter uses a fixed visualization anchor only for replay placement; it does not change the underlying local-meters geometry contract.
+- The default replay output path is `<csv>.czml`.
+- The viewer uses CesiumJS from its public CDN, so the browser needs internet access for the first load.
+- Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, `opencode.json.home_network`, and the `.tmp-phase6-*.csv` / `.svg` / `.czml` artifacts out of git.

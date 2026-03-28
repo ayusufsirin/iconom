@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Phase 6 CZML Viewer</title>
+    <link
+      rel="stylesheet"
+      href="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Widgets/widgets.css"
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #10131a;
+        --panel: rgba(16, 19, 26, 0.88);
+        --panel-border: rgba(255, 255, 255, 0.12);
+        --text: #f3f5f7;
+        --muted: #b7c0cc;
+        --accent: #69d2e7;
+        --accent-2: #ffb703;
+        --danger: #ff6b6b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body,
+      #cesiumContainer {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--bg);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      #hud {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        z-index: 10;
+        width: min(420px, calc(100vw - 32px));
+        padding: 16px;
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        background: var(--panel);
+        color: var(--text);
+        backdrop-filter: blur(10px);
+      }
+
+      #hud h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+
+      #hud p {
+        margin: 0 0 10px;
+        color: var(--muted);
+        line-height: 1.4;
+        font-size: 14px;
+      }
+
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      input[type="text"] {
+        flex: 1;
+        min-width: 0;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--panel-border);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+      }
+
+      input[type="file"] {
+        width: 100%;
+        margin-top: 10px;
+        color: var(--muted);
+      }
+
+      button {
+        padding: 10px 14px;
+        border: 0;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #0d1b22;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        background: var(--accent-2);
+        color: #241800;
+      }
+
+      #dropZone {
+        margin-top: 12px;
+        padding: 16px;
+        border: 2px dashed rgba(105, 210, 231, 0.55);
+        border-radius: 14px;
+        text-align: center;
+        color: var(--muted);
+        transition: border-color 120ms ease, background 120ms ease;
+      }
+
+      #dropZone.active {
+        border-color: var(--accent);
+        background: rgba(105, 210, 231, 0.08);
+      }
+
+      #status {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--muted);
+        font-size: 13px;
+        white-space: pre-wrap;
+      }
+
+      #status.error {
+        color: #fff;
+        background: rgba(255, 107, 107, 0.16);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+
+    <section id="hud">
+      <h1>Phase 6 CZML Viewer</h1>
+      <p>
+        Load a replay exported by <code>scripts/export-phase6-czml.py</code>. You can drag and drop a
+        <code>.czml</code> file, choose one from disk, or load a same-origin path served from this repo.
+      </p>
+
+      <div class="row">
+        <input id="pathInput" type="text" value="/ros2_ws/.tmp-phase6-live-rival-geometry.csv.czml" />
+        <button id="loadPathButton">Load Path</button>
+      </div>
+
+      <input id="fileInput" type="file" accept=".czml,.json,application/json" />
+
+      <div id="dropZone">Drop a <code>.czml</code> file here</div>
+
+      <div class="row">
+        <button id="fitButton" class="secondary">Refit View</button>
+        <button id="clearButton" class="secondary">Clear Replay</button>
+      </div>
+
+      <div id="status">Waiting for replay input.</div>
+    </section>
+
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Cesium.js"></script>
+    <script>
+      const statusEl = document.getElementById("status");
+      const dropZone = document.getElementById("dropZone");
+      const fileInput = document.getElementById("fileInput");
+      const pathInput = document.getElementById("pathInput");
+      const loadPathButton = document.getElementById("loadPathButton");
+      const fitButton = document.getElementById("fitButton");
+      const clearButton = document.getElementById("clearButton");
+
+      const viewer = new Cesium.Viewer("cesiumContainer", {
+        animation: true,
+        timeline: true,
+        baseLayerPicker: false,
+        geocoder: false,
+        homeButton: true,
+        navigationHelpButton: false,
+        sceneModePicker: true,
+        infoBox: true,
+        selectionIndicator: true,
+        imageryProvider: new Cesium.OpenStreetMapImageryProvider({
+          url: "https://tile.openstreetmap.org/",
+        }),
+        terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+      });
+
+      viewer.scene.globe.show = true;
+      viewer.clock.shouldAnimate = true;
+
+      let activeDataSource = null;
+
+      function setStatus(message, isError = false) {
+        statusEl.textContent = message;
+        statusEl.classList.toggle("error", isError);
+      }
+
+      async function replaceDataSource(dataSource, sourceLabel) {
+        if (activeDataSource) {
+          await viewer.dataSources.remove(activeDataSource, true);
+          activeDataSource = null;
+        }
+        activeDataSource = dataSource;
+        await viewer.dataSources.add(dataSource);
+        await viewer.flyTo(dataSource);
+        setStatus(`Loaded replay from ${sourceLabel}`);
+      }
+
+      async function loadFromText(text, sourceLabel) {
+        try {
+          const czml = JSON.parse(text);
+          const dataSource = await Cesium.CzmlDataSource.load(czml);
+          await replaceDataSource(dataSource, sourceLabel);
+        } catch (error) {
+          console.error(error);
+          setStatus(`Failed to load replay from ${sourceLabel}: ${error.message}`, true);
+        }
+      }
+
+      async function loadFromFile(file) {
+        if (!file) {
+          return;
+        }
+        setStatus(`Reading ${file.name} ...`);
+        const text = await file.text();
+        await loadFromText(text, file.name);
+      }
+
+      async function loadFromPath(path) {
+        const trimmed = path.trim();
+        if (!trimmed) {
+          setStatus("Enter a same-origin CZML path first.", true);
+          return;
+        }
+        try {
+          setStatus(`Fetching ${trimmed} ...`);
+          const response = await fetch(trimmed);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const text = await response.text();
+          await loadFromText(text, trimmed);
+        } catch (error) {
+          console.error(error);
+          setStatus(`Failed to fetch ${trimmed}: ${error.message}`, true);
+        }
+      }
+
+      function clearReplay() {
+        if (!activeDataSource) {
+          setStatus("No replay is loaded.");
+          return;
+        }
+        viewer.dataSources.remove(activeDataSource, true);
+        activeDataSource = null;
+        setStatus("Replay cleared.");
+      }
+
+      loadPathButton.addEventListener("click", () => loadFromPath(pathInput.value));
+      fileInput.addEventListener("change", (event) => loadFromFile(event.target.files[0]));
+      fitButton.addEventListener("click", () => {
+        if (activeDataSource) {
+          viewer.flyTo(activeDataSource);
+        } else {
+          setStatus("No replay is loaded.");
+        }
+      });
+      clearButton.addEventListener("click", clearReplay);
+
+      dropZone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropZone.classList.add("active");
+      });
+      dropZone.addEventListener("dragleave", () => dropZone.classList.remove("active"));
+      dropZone.addEventListener("drop", async (event) => {
+        event.preventDefault();
+        dropZone.classList.remove("active");
+        const file = event.dataTransfer.files[0];
+        await loadFromFile(file);
+      });
+
+      const queryPath = new URLSearchParams(window.location.search).get("src");
+      if (queryPath) {
+        pathInput.value = queryPath;
+        loadFromPath(queryPath);
+      }
+    </script>
+  </body>
+</html>

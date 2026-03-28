@@ -493,6 +493,22 @@ You can also choose the output path explicitly:
 python3 ./scripts/plot-phase6-scripted-cue-geometry.py ./ros2_ws/.tmp-phase6-scripted-cue-geometry.csv --output /tmp/phase6-scripted-cue.svg
 ```
 
+To export either the scripted or live geometry CSV as a time-aware Cesium replay:
+
+```bash
+python3 ./scripts/export-phase6-czml.py ./ros2_ws/.tmp-phase6-live-rival-geometry.csv
+```
+
+The exporter writes `<csv>.czml` by default and uses a fixed visualization anchor for replay only. The tracked flight geometry remains in local simulation meters; the anchor simply places the replay on a deterministic WGS84 location so Cesium can play it over time.
+
+To open a local Cesium viewer with drag-drop and same-origin path loading:
+
+```bash
+./scripts/serve-phase6-czml-viewer.sh
+```
+
+Then open `http://127.0.0.1:8765/docs/phase6-czml-viewer.html` and either drag a `.czml` file into the page or load `/ros2_ws/.tmp-phase6-live-rival-geometry.csv.czml` directly inside the viewer.
+
 ## Phase 6 Acceptance
 
 The maintained phase-6 acceptance wrapper runs the current pursuit-guidance baseline in sequence:
