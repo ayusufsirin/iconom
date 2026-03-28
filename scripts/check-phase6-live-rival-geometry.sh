@@ -518,6 +518,10 @@ PLANE2_ROUTE_LEG_DWELL_SEC="${PHASE6_LIVE_RIVAL_RECT_LEG_DWELL_SEC:-6}"
 PLANE2_ROUTE_LOITER_RADIUS_M="${PHASE6_LIVE_RIVAL_RECT_LOITER_RADIUS_M:-30.0}"
 PLANE2_ROUTE_GROUNDSPEED_M_S="${PHASE6_LIVE_RIVAL_RECT_GROUNDSPEED_M_S:-12.0}"
 CUE_THRUST_X="${PHASE6_CUE_THRUST_X:-0.66}"
+CUE_MIN_THRUST_X="${PHASE6_CUE_MIN_THRUST_X:-0.36}"
+CUE_RANGE_THRUST_GAIN="${PHASE6_CUE_RANGE_THRUST_GAIN:-0.02}"
+TARGET_CHASE_RANGE_M="${PHASE6_TARGET_CHASE_RANGE_M:-5.0}"
+CHASE_RANGE_TOLERANCE_M="${PHASE6_CHASE_RANGE_TOLERANCE_M:-5.0}"
 CUE_ROLL_ANGLE_GAIN="${PHASE6_CUE_ROLL_ANGLE_GAIN:-0.80}"
 CUE_MAX_ROLL_DEG="${PHASE6_CUE_MAX_ROLL_DEG:-35.0}"
 CUE_PITCH_ANGLE_DEG="${PHASE6_CUE_PITCH_ANGLE_DEG:-2.0}"
@@ -550,7 +554,7 @@ echo "  - both aircraft take off and stabilize"
 echo "  - plane_02 publishes live rival state into /competition/rival/state"
 echo "  - plane_01 runs the maintained phase-6 cueing path against the real plane_02 target"
 echo "  - plane_02 flies a long straight live-rival route to support sustained stern-chase hold"
-echo "  - recorded ownship-versus-rival geometry shows a sustained airborne stern-chase hold in the forward cone with meaningful range closure, final proximity, and heading alignment"
+echo "  - recorded ownship-versus-rival geometry shows a sustained airborne stern-chase hold in the forward cone while keeping an env-driven trailing range and heading alignment"
 echo "  - after cueing, both aircraft must complete a successful landing"
 echo
 
@@ -668,7 +672,7 @@ ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source 
 PLANNER_PID=$!
 ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/pursuit_state_machine" >"${STATE_MACHINE_LOG}" 2>&1 &
 STATE_MACHINE_PID=$!
-ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/camera_cueing_bridge --ros-args -p vehicle_namespace:='${PLANE1_NAMESPACE}' -p publish_rate_hz:=20.0 -p thrust_x:=${CUE_THRUST_X} -p roll_angle_gain:=${CUE_ROLL_ANGLE_GAIN} -p max_roll_deg:=${CUE_MAX_ROLL_DEG} -p pitch_angle_deg:=${CUE_PITCH_ANGLE_DEG} -p pitch_angle_gain:=${CUE_PITCH_ANGLE_GAIN} -p max_pitch_deg:=${CUE_MAX_PITCH_DEG} -p altitude_error_deadband_m:=${CUE_ALTITUDE_ERROR_DEADBAND_M} -p capture_error_deg:=${CUE_CAPTURE_ERROR_DEG}" >"${CUEING_LOG}" 2>&1 &
+ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/camera_cueing_bridge --ros-args -p vehicle_namespace:='${PLANE1_NAMESPACE}' -p publish_rate_hz:=20.0 -p thrust_x:=${CUE_THRUST_X} -p roll_angle_gain:=${CUE_ROLL_ANGLE_GAIN} -p max_roll_deg:=${CUE_MAX_ROLL_DEG} -p pitch_angle_deg:=${CUE_PITCH_ANGLE_DEG} -p pitch_angle_gain:=${CUE_PITCH_ANGLE_GAIN} -p max_pitch_deg:=${CUE_MAX_PITCH_DEG} -p altitude_error_deadband_m:=${CUE_ALTITUDE_ERROR_DEADBAND_M} -p min_thrust_x:=${CUE_MIN_THRUST_X} -p range_thrust_gain:=${CUE_RANGE_THRUST_GAIN} -p target_chase_range_m:=${TARGET_CHASE_RANGE_M} -p chase_range_tolerance_m:=${CHASE_RANGE_TOLERANCE_M} -p capture_error_deg:=${CUE_CAPTURE_ERROR_DEG}" >"${CUEING_LOG}" 2>&1 &
 CUEING_PID=$!
 
 wait_for_topics $'/competition/ownship/state\n/competition/rival/state\n/competition/prediction/rival_position\n/guidance/selected_target\n/guidance/intercept_target\n/guidance/pursuit_state\n/guidance/camera_cue_error_deg' 30
@@ -703,12 +707,12 @@ echo "initial cue error: ${INITIAL_CUE_ERROR} deg"
 
 echo "step 15: confirming the cueing bridge emits PX4 attitude offboard setpoints"
 for ((i = 1; i <= 30; i++)); do
-  if grep -q 'published cueing offboard setpoint' "${CUEING_LOG}"; then
+  if grep -q 'published trailing-slot cueing setpoint' "${CUEING_LOG}"; then
     break
   fi
   sleep 1
 done
-if ! grep -q 'published cueing offboard setpoint' "${CUEING_LOG}"; then
+if ! grep -q 'published trailing-slot cueing setpoint' "${CUEING_LOG}"; then
   echo "camera cueing bridge did not publish any PX4 attitude offboard setpoint against the live rival" >&2
   cat "${CUEING_LOG}" >&2 || true
   exit 206
@@ -748,7 +752,7 @@ run_status_waiter "${PLANE2_NAMESPACE}" "${PLANE2_STATUS_TOPIC}" "${PLANE2_STATU
 run_land_detected_waiter "${PLANE2_NAMESPACE}" "/${PLANE2_NAMESPACE}/fmu/out/vehicle_land_detected" "${PLANE2_LAND_DETECTED_LOG}" "${LAND_DETECTED_TIMEOUT_SEC}" 'true'
 
 echo "step 19: validating the recorded live-rival geometry artifact"
-GEOMETRY_SUMMARY="$("${ROOT_DIR}/scripts/evaluate-phase6-geometry.py" "${CSV_PATH}" --initial-bearing-min-deg "${INITIAL_BEARING_ERROR_MIN_DEG}" --bearing-improvement-min-deg "${BEARING_IMPROVEMENT_MIN_DEG}" --rival-route-min-distance-m "${RIVAL_MIN_ROUTE_DISTANCE_M}" --final-bearing-max-deg "${FINAL_BEARING_ERROR_MAX_DEG}" --final-cue-max-deg "${FINAL_CUE_ERROR_MAX_DEG}" --catch-min-altitude-m "${CATCH_MIN_ALTITUDE_M}" --hold-sec "${CUE_HOLD_SEC}" --initial-range-min-m "${INITIAL_RANGE_MIN_M}" --range-reduction-min-m "${RANGE_REDUCTION_MIN_M}" --final-range-max-m "${FINAL_RANGE_MAX_M}" --tail-angle-max-deg "${TAIL_ANGLE_MAX_DEG}" --heading-alignment-max-deg "${HEADING_ALIGNMENT_MAX_DEG}")"
+GEOMETRY_SUMMARY="$("${ROOT_DIR}/scripts/evaluate-phase6-geometry.py" "${CSV_PATH}" --initial-bearing-min-deg "${INITIAL_BEARING_ERROR_MIN_DEG}" --bearing-improvement-min-deg "${BEARING_IMPROVEMENT_MIN_DEG}" --rival-route-min-distance-m "${RIVAL_MIN_ROUTE_DISTANCE_M}" --final-bearing-max-deg "${FINAL_BEARING_ERROR_MAX_DEG}" --final-cue-max-deg "${FINAL_CUE_ERROR_MAX_DEG}" --catch-min-altitude-m "${CATCH_MIN_ALTITUDE_M}" --hold-sec "${CUE_HOLD_SEC}" --initial-range-min-m "${INITIAL_RANGE_MIN_M}" --range-reduction-min-m "${RANGE_REDUCTION_MIN_M}" --final-range-max-m "${FINAL_RANGE_MAX_M}" --target-range-m "${TARGET_CHASE_RANGE_M}" --range-tolerance-m "${CHASE_RANGE_TOLERANCE_M}" --tail-angle-max-deg "${TAIL_ANGLE_MAX_DEG}" --heading-alignment-max-deg "${HEADING_ALIGNMENT_MAX_DEG}")"
 
 echo "phase-6 live-rival geometry and recovery succeeded"
 echo "initial cue error: ${INITIAL_CUE_ERROR} deg"

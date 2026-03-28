@@ -22,20 +22,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--initial-range-min-m", type=float, default=None)
     parser.add_argument("--range-reduction-min-m", type=float, default=None)
     parser.add_argument("--final-range-max-m", type=float, default=None)
+    parser.add_argument("--target-range-m", type=float, default=None)
+    parser.add_argument("--range-tolerance-m", type=float, default=None)
     parser.add_argument("--tail-angle-max-deg", type=float, default=None)
     parser.add_argument("--heading-alignment-max-deg", type=float, default=None)
     return parser.parse_args()
-
 
 
 def wrap_angle(angle_rad: float) -> float:
     return math.atan2(math.sin(angle_rad), math.cos(angle_rad))
 
 
-
 def angle_error_deg(a_deg: float, b_deg: float) -> float:
     return abs(math.degrees(wrap_angle(math.radians(a_deg - b_deg))))
-
 
 
 def load_rows(csv_path: Path) -> list[dict[str, float]]:
@@ -74,7 +73,6 @@ def load_rows(csv_path: Path) -> list[dict[str, float]]:
     return rows
 
 
-
 def estimate_sample_period(rows: list[dict[str, float]]) -> float:
     if len(rows) < 2:
         return 0.2
@@ -85,7 +83,6 @@ def estimate_sample_period(rows: list[dict[str, float]]) -> float:
     return sum(deltas) / len(deltas)
 
 
-
 def range_3d_m(row: dict[str, float]) -> float:
     return math.sqrt(
         (row["rival_x"] - row["own_x"]) ** 2
@@ -94,10 +91,8 @@ def range_3d_m(row: dict[str, float]) -> float:
     )
 
 
-
 def altitude_agl_m(row: dict[str, float]) -> float:
     return -row["own_z"]
-
 
 
 def row_satisfies_hold(
@@ -106,23 +101,28 @@ def row_satisfies_hold(
     final_cue_max_deg: float,
     catch_min_altitude_m: float,
     final_range_max_m: float | None,
+    target_range_m: float | None,
+    range_tolerance_m: float | None,
     tail_angle_max_deg: float | None,
     heading_alignment_max_deg: float | None,
 ) -> bool:
+    current_range = range_3d_m(row)
     if row["bearing_error_deg"] > final_bearing_max_deg:
         return False
     if row["camera_cue_error_deg"] > final_cue_max_deg:
         return False
     if altitude_agl_m(row) < catch_min_altitude_m:
         return False
-    if final_range_max_m is not None and range_3d_m(row) > final_range_max_m:
+    if final_range_max_m is not None and current_range > final_range_max_m:
         return False
+    if target_range_m is not None and range_tolerance_m is not None:
+        if abs(current_range - target_range_m) > range_tolerance_m:
+            return False
     if tail_angle_max_deg is not None and row["tail_angle_deg"] > tail_angle_max_deg:
         return False
     if heading_alignment_max_deg is not None and row["heading_alignment_error_deg"] > heading_alignment_max_deg:
         return False
     return True
-
 
 
 def find_hold_window(
@@ -135,6 +135,8 @@ def find_hold_window(
     initial_range: float,
     range_reduction_min_m: float | None,
     final_range_max_m: float | None,
+    target_range_m: float | None,
+    range_tolerance_m: float | None,
     tail_angle_max_deg: float | None,
     heading_alignment_max_deg: float | None,
 ) -> tuple[int, int] | None:
@@ -148,6 +150,8 @@ def find_hold_window(
             final_cue_max_deg,
             catch_min_altitude_m,
             final_range_max_m,
+            target_range_m,
+            range_tolerance_m,
             tail_angle_max_deg,
             heading_alignment_max_deg,
         ):
@@ -163,7 +167,6 @@ def find_hold_window(
         else:
             run_len = 0
     return None
-
 
 
 def main() -> int:
@@ -193,6 +196,8 @@ def main() -> int:
         initial_range,
         args.range_reduction_min_m,
         args.final_range_max_m,
+        args.target_range_m,
+        args.range_tolerance_m,
         args.tail_angle_max_deg,
         args.heading_alignment_max_deg,
     )
@@ -232,11 +237,18 @@ def main() -> int:
         raise SystemExit(
             f"catch range {catch_range:.3f} m was above required {args.final_range_max_m:.3f} m"
         )
+    if args.target_range_m is not None and args.range_tolerance_m is not None:
+        if abs(catch_range - args.target_range_m) > args.range_tolerance_m:
+            raise SystemExit(
+                f"catch range {catch_range:.3f} m was outside target band {args.target_range_m:.3f} +/- {args.range_tolerance_m:.3f} m"
+            )
 
     hold_rows = rows[hold_start_idx : hold_end_idx + 1]
     hold_duration = max(sample_period, catch["t_sec"] - hold_start["t_sec"] + sample_period)
     hold_tail_angle_max = max(row["tail_angle_deg"] for row in hold_rows)
     hold_heading_alignment_max = max(row["heading_alignment_error_deg"] for row in hold_rows)
+    hold_range_max = max(range_3d_m(row) for row in hold_rows)
+    hold_range_min = min(range_3d_m(row) for row in hold_rows)
 
     print(f"initial_bearing_error_deg={initial['bearing_error_deg']:.3f}")
     print(f"initial_cue_error_deg={initial['camera_cue_error_deg']:.3f}")
@@ -255,6 +267,8 @@ def main() -> int:
     print(f"hold_end_t_sec={catch['t_sec']:.3f}")
     print(f"hold_tail_angle_max_deg={hold_tail_angle_max:.3f}")
     print(f"hold_heading_alignment_error_max_deg={hold_heading_alignment_max:.3f}")
+    print(f"hold_range_min_m={hold_range_min:.3f}")
+    print(f"hold_range_max_m={hold_range_max:.3f}")
     print(f"catch_t_sec={catch['t_sec']:.3f}")
     return 0
 
