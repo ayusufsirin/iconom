@@ -1,26 +1,29 @@
 # SESSION
 
 ## Goal
-Add a docker-side camera-view helper so the ownship camera feed can be inspected while the phase-6 GUI sim is running.
+Provide maintained operator camera-viewer paths for phase-6 GUI runs.
 
 ## Current status
-The repo already exposes `/plane_01/camera/image_raw` and `/plane_02/camera/image_raw`, but `ros2_app` did not have GUI image-view tooling or X11 wiring. This slice adds `rqt_image_view` to the `ros2_app` image, routes X11 into that service in the local override stack, and adds a helper script to open the ownship feed from inside the running container.
+The repo now has both a docker-side `rqt_image_view` helper and a rosbridge-based browser viewer for the phase-6 camera feed. The browser page was visually confirmed to connect to `rosbridge`, and the `rqt` helper now auto-starts `ros_gz_bridge` and waits for the camera topic before opening the window.
 
 ## Files touched
 - /home/joseph/Projects/iconom/docker/ros2_app/Dockerfile
-- /home/joseph/Projects/iconom/docker-compose.override.yml
+- /home/joseph/Projects/iconom/docker-compose.yml
+- /home/joseph/Projects/iconom/.env.example
+- /home/joseph/Projects/iconom/docs/phase6-camera-viewer.html
+- /home/joseph/Projects/iconom/scripts/serve-phase6-camera-web.sh
 - /home/joseph/Projects/iconom/scripts/view-phase6-ownship-camera.sh
 - /home/joseph/Projects/iconom/README.md
 - /home/joseph/Projects/iconom/SESSION.md
 
 ## Last completed step
-Patched the repo for docker-side camera viewing: package install, X11 wiring, and a maintained helper script.
+Verified the browser viewer connection and the live ownship camera feed, and fixed the `rqt` path so it brings up `ros_gz_bridge` automatically when needed.
 
 ## Current blocker
-Runtime validation is still pending against a rebuilt `ros2_app` image.
+None
 
 ## Next exact step
-Rebuild `ros2_app`, then run `/home/joseph/Projects/iconom/scripts/view-phase6-ownship-camera.sh` while the GUI sim is active and confirm that `rqt_image_view` opens `/plane_01/camera/image_raw`.
+None
 
 ## Validation
 ```bash
@@ -30,7 +33,12 @@ bash -n ./scripts/view-phase6-ownship-camera.sh
 
 ```bash
 cd /home/joseph/Projects/iconom
-docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.override.yml build ros2_app
+bash -n ./scripts/serve-phase6-camera-web.sh
+```
+
+```bash
+cd /home/joseph/Projects/iconom
+docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.override.yml config
 ```
 
 ```bash
@@ -41,5 +49,5 @@ ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-geometry.sh --
 ```
 
 ## Notes
+- `view-phase6-ownship-camera.sh` now handles the `ros_gz_bridge` dependency itself.
 - Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, `opencode.json.home_network`, and the `.tmp-phase6-*.csv` / `.svg` / `.czml` artifacts out of git.
-- Override the viewed topic with `CAMERA_TOPIC=/plane_02/camera/image_raw` for the rival camera.

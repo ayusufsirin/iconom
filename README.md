@@ -469,7 +469,18 @@ xhost +local:docker
 ./scripts/view-phase6-ownship-camera.sh
 ```
 
-The helper defaults to `/plane_01/camera/image_raw`. Override the topic with `CAMERA_TOPIC=/plane_02/camera/image_raw` if you want the rival feed instead.
+The helper now starts `ros_gz_bridge` automatically if it is not already running and waits for the requested camera topic to appear before opening `rqt_image_view`. The helper defaults to `/plane_01/camera/image_raw`. Override the topic with `CAMERA_TOPIC=/plane_02/camera/image_raw` if you want the rival feed instead.
+
+To view the same feed in a browser over rosbridge while the sim is running:
+
+```bash
+docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.override.yml up -d rosbridge
+./scripts/serve-phase6-camera-web.sh
+```
+
+Then open `http://127.0.0.1:${PHASE6_CAMERA_WEB_PORT:-8766}/docs/phase6-camera-viewer.html` and connect to `ws://127.0.0.1:${ROSBRIDGE_PORT:-9090}` with `/plane_01/camera/image_raw` or `/plane_02/camera/image_raw`.
+
+The helper now starts a compose-managed `camera_web` service instead of relying on a host-side Python HTTP server, so the whole browser-viewer path can stay inside Docker.
 
 ## Phase 6 Scripted Cue Geometry Hardening
 

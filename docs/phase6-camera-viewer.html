@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iconom Phase 6 Camera Viewer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1720;
+      --panel: #16212d;
+      --line: #314659;
+      --text: #e6edf3;
+      --muted: #9eb0c3;
+      --accent: #7dd3fc;
+      --ok: #86efac;
+      --warn: #fca5a5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1b2a3a 0%, var(--bg) 55%);
+      color: var(--text);
+    }
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    h1 { margin: 0 0 8px; font-size: 2rem; }
+    p { color: var(--muted); margin: 0 0 16px; }
+    .controls, .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .card {
+      background: rgba(22, 33, 45, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    }
+    label { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 6px; }
+    input {
+      width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+      background: #0b141d; color: var(--text); font-size: 0.95rem;
+    }
+    button {
+      border: none; border-radius: 10px; padding: 11px 14px; font-size: 0.95rem; font-weight: 600;
+      cursor: pointer; background: var(--accent); color: #062033;
+    }
+    button.secondary { background: #253445; color: var(--text); }
+    .viewer {
+      display: grid; gap: 16px; align-items: start;
+      grid-template-columns: minmax(0, 1fr) 280px;
+    }
+    canvas {
+      width: 100%; max-height: 72vh; background: #02070c; border: 1px solid var(--line); border-radius: 14px;
+      image-rendering: pixelated;
+    }
+    .stat { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .stat:last-child { border-bottom: none; }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    @media (max-width: 900px) {
+      .viewer { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Phase 6 Camera Viewer</h1>
+    <p>Simple browser viewer for ROS 2 camera images over rosbridge. Defaults to the ownship feed on <code>/plane_01/camera/image_raw</code>.</p>
+
+    <section class="controls">
+      <div class="card">
+        <label for="wsUrl">Rosbridge WebSocket</label>
+        <input id="wsUrl" value="ws://127.0.0.1:9090">
+      </div>
+      <div class="card">
+        <label for="topicName">Image Topic</label>
+        <input id="topicName" value="/plane_01/camera/image_raw">
+      </div>
+      <div class="card">
+        <label for="throttleMs">Throttle Rate (ms)</label>
+        <input id="throttleMs" value="100">
+      </div>
+      <div class="card">
+        <label>Controls</label>
+        <div style="display:flex; gap:10px;">
+          <button id="connectButton">Connect</button>
+          <button id="disconnectButton" class="secondary">Disconnect</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="viewer">
+      <canvas id="imageCanvas" width="1280" height="720"></canvas>
+      <div class="card stats">
+        <div class="stat"><span>Status</span><strong id="statusText" class="warn">disconnected</strong></div>
+        <div class="stat"><span>Topic</span><strong id="topicText">/plane_01/camera/image_raw</strong></div>
+        <div class="stat"><span>Frames</span><strong id="frameCount">0</strong></div>
+        <div class="stat"><span>Size</span><strong id="sizeText">-</strong></div>
+        <div class="stat"><span>Encoding</span><strong id="encodingText">-</strong></div>
+        <div class="stat"><span>Step</span><strong id="stepText">-</strong></div>
+        <div class="stat"><span>Stamp</span><strong id="stampText">-</strong></div>
+        <div class="stat"><span>Last Error</span><strong id="errorText">-</strong></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('imageCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('statusText');
+    const topicText = document.getElementById('topicText');
+    const frameCountText = document.getElementById('frameCount');
+    const sizeText = document.getElementById('sizeText');
+    const encodingText = document.getElementById('encodingText');
+    const stepText = document.getElementById('stepText');
+    const stampText = document.getElementById('stampText');
+    const errorText = document.getElementById('errorText');
+    const wsUrlInput = document.getElementById('wsUrl');
+    const topicInput = document.getElementById('topicName');
+    const throttleInput = document.getElementById('throttleMs');
+
+    let socket = null;
+    let frameCount = 0;
+    let currentTopic = topicInput.value;
+
+    function setStatus(text, ok = false) {
+      statusText.textContent = text;
+      statusText.className = ok ? 'ok' : 'warn';
+    }
+
+    function setError(text) {
+      errorText.textContent = text || '-';
+    }
+
+    function wrapChannelCount(encoding) {
+      switch ((encoding || '').toLowerCase()) {
+        case 'rgb8':
+        case 'bgr8':
+          return 3;
+        case 'rgba8':
+        case 'bgra8':
+          return 4;
+        case 'mono8':
+        case '8uc1':
+          return 1;
+        default:
+          throw new Error(`unsupported encoding: ${encoding}`);
+      }
+    }
+
+    function decodeBytes(dataField) {
+      if (Array.isArray(dataField)) {
+        return Uint8Array.from(dataField);
+      }
+      if (typeof dataField === 'string') {
+        const binary = atob(dataField);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      }
+      throw new Error('unsupported image data payload');
+    }
+
+    function renderImage(message) {
+      const width = Number(message.width || 0);
+      const height = Number(message.height || 0);
+      const encoding = message.encoding || '';
+      const step = Number(message.step || 0);
+      const channels = wrapChannelCount(encoding);
+      const bytes = decodeBytes(message.data);
+      const expectedRow = width * channels;
+      const rowStride = step || expectedRow;
+      const rgba = new Uint8ClampedArray(width * height * 4);
+
+      for (let y = 0; y < height; y += 1) {
+        const rowOffset = y * rowStride;
+        for (let x = 0; x < width; x += 1) {
+          const src = rowOffset + x * channels;
+          const dst = (y * width + x) * 4;
+          let r = 0, g = 0, b = 0, a = 255;
+          if (encoding === 'rgb8') {
+            [r, g, b] = [bytes[src], bytes[src + 1], bytes[src + 2]];
+          } else if (encoding === 'bgr8') {
+            [b, g, r] = [bytes[src], bytes[src + 1], bytes[src + 2]];
+          } else if (encoding === 'rgba8') {
+            [r, g, b, a] = [bytes[src], bytes[src + 1], bytes[src + 2], bytes[src + 3]];
+          } else if (encoding === 'bgra8') {
+            [b, g, r, a] = [bytes[src], bytes[src + 1], bytes[src + 2], bytes[src + 3]];
+          } else {
+            r = g = b = bytes[src];
+          }
+          rgba[dst] = r;
+          rgba[dst + 1] = g;
+          rgba[dst + 2] = b;
+          rgba[dst + 3] = a;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx.putImageData(new ImageData(rgba, width, height), 0, 0);
+
+      frameCount += 1;
+      frameCountText.textContent = String(frameCount);
+      sizeText.textContent = `${width} x ${height}`;
+      encodingText.textContent = encoding;
+      stepText.textContent = String(step || expectedRow);
+      stampText.textContent = `${message.header?.stamp?.sec ?? 0}.${String(message.header?.stamp?.nanosec ?? 0).padStart(9, '0')}`;
+      topicText.textContent = currentTopic;
+      setError('');
+    }
+
+    function disconnect() {
+      if (socket) {
+        socket.close();
+        socket = null;
+      }
+      setStatus('disconnected', false);
+    }
+
+    function connect() {
+      disconnect();
+      frameCount = 0;
+      frameCountText.textContent = '0';
+      currentTopic = topicInput.value.trim();
+      setStatus('connecting', false);
+      topicText.textContent = currentTopic;
+
+      socket = new WebSocket(wsUrlInput.value.trim());
+      socket.onopen = () => {
+        setStatus('connected', true);
+        socket.send(JSON.stringify({
+          op: 'subscribe',
+          topic: currentTopic,
+          type: 'sensor_msgs/msg/Image',
+          throttle_rate: Number(throttleInput.value || 0),
+          queue_length: 1,
+        }));
+      };
+      socket.onmessage = (event) => {
+        const payload = JSON.parse(event.data);
+        if (payload.op === 'publish' && payload.msg) {
+          try {
+            renderImage(payload.msg);
+          } catch (error) {
+            setError(error.message);
+          }
+        }
+      };
+      socket.onerror = () => {
+        setStatus('error', false);
+        setError('websocket transport error');
+      };
+      socket.onclose = () => {
+        setStatus('disconnected', false);
+      };
+    }
+
+    document.getElementById('connectButton').addEventListener('click', connect);
+    document.getElementById('disconnectButton').addEventListener('click', disconnect);
+  </script>
+</body>
+</html>

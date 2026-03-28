@@ -10,6 +10,8 @@ COMPOSE_ARGS=(
 )
 CAMERA_TOPIC="${CAMERA_TOPIC:-/plane_01/camera/image_raw}"
 SERVICE_NAME="${SERVICE_NAME:-ros2_app}"
+BRIDGE_SERVICE="${BRIDGE_SERVICE:-ros_gz_bridge}"
+CAMERA_WAIT_SEC="${CAMERA_WAIT_SEC:-20}"
 
 if [[ -z "${DISPLAY:-}" ]]; then
   echo "DISPLAY is not set; run this from the same X11 session as the Gazebo GUI." >&2
@@ -21,6 +23,30 @@ if ! docker compose "${COMPOSE_ARGS[@]}" ps --status running "$SERVICE_NAME" >/d
   exit 1
 fi
 
+if ! docker compose "${COMPOSE_ARGS[@]}" ps --status running "$BRIDGE_SERVICE" >/dev/null 2>&1; then
+  echo "starting $BRIDGE_SERVICE so $CAMERA_TOPIC is bridged into ROS 2"
+  docker compose "${COMPOSE_ARGS[@]}" up -d "$BRIDGE_SERVICE" >/dev/null
+fi
+
+echo "waiting for $CAMERA_TOPIC to appear in ROS 2"
+docker compose "${COMPOSE_ARGS[@]}" exec -T "$SERVICE_NAME" bash -lc '
+  source /opt/ros/humble/setup.bash
+  end=$((SECONDS + '"${CAMERA_WAIT_SEC}"'))
+  while (( SECONDS < end )); do
+    if ros2 topic list | grep -Fxq '"${CAMERA_TOPIC}"'; then
+      exit 0
+    fi
+    sleep 1
+  done
+  echo "camera topic did not appear: '"${CAMERA_TOPIC}"'" >&2
+  exit 1
+'
+
 echo "opening docker-side camera viewer for $CAMERA_TOPIC"
 
-docker compose "${COMPOSE_ARGS[@]}" exec   -e DISPLAY="$DISPLAY"   -e QT_X11_NO_MITSHM="1"   -e XDG_RUNTIME_DIR="/tmp/runtime-root"   "$SERVICE_NAME" bash -lc "source /opt/ros/humble/setup.bash && ros2 run rqt_image_view rqt_image_view --ros-args -r image:=${CAMERA_TOPIC}"
+docker compose "${COMPOSE_ARGS[@]}" exec \
+  -e DISPLAY="$DISPLAY" \
+  -e QT_X11_NO_MITSHM="1" \
+  -e XDG_RUNTIME_DIR="/tmp/runtime-root" \
+  "$SERVICE_NAME" \
+  bash -lc "source /opt/ros/humble/setup.bash && ros2 run rqt_image_view rqt_image_view --ros-args -r image:=${CAMERA_TOPIC}"

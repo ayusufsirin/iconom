@@ -137,6 +137,40 @@ services:
     command: ["bash", "-lc", "echo 'ros2_app base workspace ready; no project packages are implemented yet'; sleep infinity"]
     restart: "no"
 
+  rosbridge:
+    build:
+      context: .
+      dockerfile: docker/ros2_app/Dockerfile
+    environment:
+      ROS_DISTRO: ${ROS_DISTRO:-humble}
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      USE_SIM_TIME: ${USE_SIM_TIME:-true}
+      ROSBRIDGE_PORT: ${ROSBRIDGE_PORT:-9090}
+    depends_on:
+      xrce_agent:
+        condition: service_started
+    working_dir: /workspaces/ros2_ws
+    volumes:
+      - ./ros2_ws:/workspaces/ros2_ws
+    command: ["bash", "-lc", "source /opt/ros/humble/setup.bash && ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=${ROSBRIDGE_PORT:-9090}"]
+    ports:
+      - "${ROSBRIDGE_PORT:-9090}:9090"
+    restart: "no"
+
+  camera_web:
+    build:
+      context: .
+      dockerfile: docker/ros2_app/Dockerfile
+    environment:
+      PHASE6_CAMERA_WEB_PORT: ${PHASE6_CAMERA_WEB_PORT:-8766}
+    working_dir: /workspaces/iconom
+    volumes:
+      - .:/workspaces/iconom:ro
+    command: ["bash", "-lc", "python3 -m http.server ${PHASE6_CAMERA_WEB_PORT:-8766} --bind 0.0.0.0 --directory /workspaces/iconom"]
+    ports:
+      - "${PHASE6_CAMERA_WEB_PORT:-8766}:${PHASE6_CAMERA_WEB_PORT:-8766}"
+    restart: "no"
+
   ros_gz_bridge:
     build:
       context: .
