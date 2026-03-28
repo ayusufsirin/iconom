@@ -443,6 +443,8 @@ The maintained check now proves:
 
 ## Phase 6 Live-Rival Geometry Hardening
 
+The maintained live-rival hardening path now uses a long straight `plane_02` run and requires a sustained stern-chase hold: forward-cone cueing, range closure, final proximity, heading alignment, and tail-angle containment for roughly `10s` before both aircraft land.
+
 The maintained live-rival cueing slice now also has a stronger standalone hardening check against the real dual-aircraft simulation. It keeps `plane_01` as ownship, uses live `plane_02` state as the rival source, records ownship-versus-rival geometry to CSV, and only passes if a sustained airborne catch occurs with meaningful range closure and final proximity before both aircraft land successfully.
 
 To run the headless live-rival geometry hardening check:
