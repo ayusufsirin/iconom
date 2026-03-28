@@ -20,6 +20,8 @@ RIVAL_COLOR = "#c62828"
 BEARING_COLOR = "#2e7d32"
 CUE_COLOR = "#ef6c00"
 CATCH_COLOR = "#6a1b9a"
+HEADING_ARROW_LEN = 22.0
+RIVAL_ARROW_LEN = 22.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,10 +37,17 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+
 def load_rows(csv_path: Path) -> list[dict[str, float]]:
     rows: list[dict[str, float]] = []
     with csv_path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise SystemExit("CSV header is missing")
+        if "rival_yaw_deg" not in reader.fieldnames:
+            raise SystemExit(
+                "CSV is missing rival_yaw_deg; rerun the geometry check to regenerate it before plotting rival heading"
+            )
         for raw in reader:
             rows.append(
                 {
@@ -46,9 +55,11 @@ def load_rows(csv_path: Path) -> list[dict[str, float]]:
                     "own_x": float(raw["own_x"]),
                     "own_y": float(raw["own_y"]),
                     "own_z": float(raw["own_z"]),
+                    "own_yaw_deg": float(raw["own_yaw_deg"]),
                     "rival_x": float(raw["rival_x"]),
                     "rival_y": float(raw["rival_y"]),
                     "rival_z": float(raw["rival_z"]),
+                    "rival_yaw_deg": float(raw["rival_yaw_deg"]),
                     "bearing_error_deg": float(raw["bearing_error_deg"]),
                     "camera_cue_error_deg": float(raw["camera_cue_error_deg"]),
                     "in_forward_cone": float(raw["in_forward_cone"]),
@@ -59,11 +70,13 @@ def load_rows(csv_path: Path) -> list[dict[str, float]]:
     return rows
 
 
+
 def find_catch_index(rows: list[dict[str, float]]) -> int | None:
     for idx, row in enumerate(rows):
         if int(row["in_forward_cone"]) == 1:
             return idx
     return None
+
 
 
 def escape(text: str) -> str:
@@ -75,6 +88,7 @@ def escape(text: str) -> str:
     )
 
 
+
 def scale_point(
     value: float, low: float, high: float, pixel_low: float, pixel_high: float
 ) -> float:
@@ -84,8 +98,25 @@ def scale_point(
     return pixel_low + ratio * (pixel_high - pixel_low)
 
 
+
 def make_polyline(points: list[tuple[float, float]]) -> str:
     return " ".join(f"{x:.1f},{y:.1f}" for x, y in points)
+
+
+
+def direction_vector_from_heading(heading_deg: float) -> tuple[float, float]:
+    radians = math.radians(heading_deg)
+    return math.cos(radians), math.sin(radians)
+
+
+
+def arrow_marker_def(marker_id: str, color: str) -> str:
+    return (
+        f'<marker id="{marker_id}" viewBox="0 0 10 10" refX="8" refY="5" '
+        f'markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
+        f'<path d="M 0 0 L 10 5 L 0 10 z" fill="{color}"/></marker>'
+    )
+
 
 
 def trajectory_panel(rows: list[dict[str, float]], catch_idx: int | None) -> str:
@@ -118,8 +149,42 @@ def trajectory_panel(rows: list[dict[str, float]], catch_idx: int | None) -> str
         py = scale_point(y, plot_min_y, plot_max_y, panel_y + panel_h - pad, panel_y + pad)
         return px, py
 
+    def map_vec(dx: float, dy: float) -> tuple[float, float]:
+        px0, py0 = map_xy(0.0, 0.0)
+        px1, py1 = map_xy(dx, dy)
+        return px1 - px0, py1 - py0
+
     own_points = [map_xy(row["own_x"], row["own_y"]) for row in rows]
     rival_points = [map_xy(row["rival_x"], row["rival_y"]) for row in rows]
+
+    heading_arrow = ""
+    rival_arrow = ""
+    if catch_idx is not None:
+        row = rows[catch_idx]
+        own_origin_x, own_origin_y = own_points[catch_idx]
+        rival_origin_x, rival_origin_y = rival_points[catch_idx]
+
+        heading_dx_world, heading_dy_world = direction_vector_from_heading(row["own_yaw_deg"])
+        heading_dx_px, heading_dy_px = map_vec(
+            heading_dx_world * HEADING_ARROW_LEN,
+            heading_dy_world * HEADING_ARROW_LEN,
+        )
+        heading_arrow = (
+            f'<line x1="{own_origin_x:.1f}" y1="{own_origin_y:.1f}" '
+            f'x2="{own_origin_x + heading_dx_px:.1f}" y2="{own_origin_y + heading_dy_px:.1f}" '
+            f'stroke="{OWN_COLOR}" stroke-width="2.5" opacity="0.8" marker-end="url(#own-heading-arrow)"/>'
+        )
+
+        rival_dx_world, rival_dy_world = direction_vector_from_heading(row["rival_yaw_deg"])
+        rival_dx_px, rival_dy_px = map_vec(
+            rival_dx_world * RIVAL_ARROW_LEN,
+            rival_dy_world * RIVAL_ARROW_LEN,
+        )
+        rival_arrow = (
+            f'<line x1="{rival_origin_x:.1f}" y1="{rival_origin_y:.1f}" '
+            f'x2="{rival_origin_x + rival_dx_px:.1f}" y2="{rival_origin_y + rival_dy_px:.1f}" '
+            f'stroke="{RIVAL_COLOR}" stroke-width="2.5" opacity="0.8" marker-end="url(#rival-heading-arrow)"/>'
+        )
 
     grid_lines = []
     for step in range(6):
@@ -149,11 +214,17 @@ def trajectory_panel(rows: list[dict[str, float]], catch_idx: int | None) -> str
 
     return f"""
 <g>
+  <defs>
+    {arrow_marker_def('own-heading-arrow', OWN_COLOR)}
+    {arrow_marker_def('rival-heading-arrow', RIVAL_COLOR)}
+  </defs>
   <text x="{panel_x}" y="40" fill="{TEXT_COLOR}" font-size="30" font-weight="700">Top-down trajectories</text>
   <rect x="{panel_x}" y="{panel_y}" width="{panel_w}" height="{panel_h}" rx="16" fill="{PLOT_BG}" stroke="{AXIS_COLOR}" stroke-width="2"/>
   {''.join(grid_lines)}
   <polyline points="{make_polyline(own_points)}" fill="none" stroke="{OWN_COLOR}" stroke-width="4"/>
   <polyline points="{make_polyline(rival_points)}" fill="none" stroke="{RIVAL_COLOR}" stroke-width="4" stroke-dasharray="10 8"/>
+  {rival_arrow}
+  {heading_arrow}
   <circle cx="{start_own[0]:.1f}" cy="{start_own[1]:.1f}" r="6" fill="{OWN_COLOR}"/>
   <circle cx="{start_rival[0]:.1f}" cy="{start_rival[1]:.1f}" r="6" fill="{RIVAL_COLOR}"/>
   {catch_marker}
@@ -163,8 +234,11 @@ def trajectory_panel(rows: list[dict[str, float]], catch_idx: int | None) -> str
   <circle cx="{panel_x + 330}" cy="{panel_y + 26}" r="6" fill="{RIVAL_COLOR}"/>
   <text x="{panel_x + 370}" y="{panel_y + 32}" fill="{TEXT_COLOR}" font-size="18">catch sample</text>
   <circle cx="{panel_x + 505}" cy="{panel_y + 26}" r="6" fill="{CATCH_COLOR}"/>
+  <text x="{panel_x + 18}" y="{panel_y + 58}" fill="{OWN_COLOR}" font-size="16">blue arrow at catch: ownship heading</text>
+  <text x="{panel_x + 320}" y="{panel_y + 58}" fill="{RIVAL_COLOR}" font-size="16">red arrow at catch: rival heading</text>
 </g>
 """
+
 
 
 def error_panel(rows: list[dict[str, float]], catch_idx: int | None) -> str:
@@ -215,6 +289,7 @@ def error_panel(rows: list[dict[str, float]], catch_idx: int | None) -> str:
   <text x="{panel_x + 190}" y="{panel_y + 62}" fill="{CUE_COLOR}" font-size="18">camera cue error</text>
 </g>
 """
+
 
 
 def summary_panel(rows: list[dict[str, float]], catch_idx: int | None, csv_path: Path) -> str:
@@ -271,6 +346,7 @@ def summary_panel(rows: list[dict[str, float]], catch_idx: int | None, csv_path:
 """
 
 
+
 def render_svg(rows: list[dict[str, float]], catch_idx: int | None, csv_path: Path) -> str:
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{SVG_WIDTH}" height="{SVG_HEIGHT}" viewBox="0 0 {SVG_WIDTH} {SVG_HEIGHT}">
 <rect width="100%" height="100%" fill="#ffffff"/>
@@ -280,6 +356,7 @@ def render_svg(rows: list[dict[str, float]], catch_idx: int | None, csv_path: Pa
 {summary_panel(rows, catch_idx, csv_path)}
 </svg>
 """
+
 
 
 def main() -> int:

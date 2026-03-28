@@ -420,97 +420,17 @@ assert_airborne_catch_state() {
 
 summarize_geometry_csv() {
   local csv_path="$1"
-  local catch_bearing_deg="$2"
-  local catch_cue_deg="$3"
-  python3 - "${csv_path}" "${INITIAL_BEARING_ERROR_MIN_DEG}" "${BEARING_IMPROVEMENT_MIN_DEG}" "${RIVAL_MIN_ROUTE_DISTANCE_M}" "${FINAL_BEARING_ERROR_MAX_DEG}" "${FINAL_CUE_ERROR_MAX_DEG}" "${CATCH_MIN_ALTITUDE_M}" "${CUE_HOLD_SEC}" "${catch_bearing_deg}" "${catch_cue_deg}" <<'PY'
-import csv
-import math
-import sys
-from pathlib import Path
-
-csv_path = Path(sys.argv[1])
-initial_min = float(sys.argv[2])
-improvement_min = float(sys.argv[3])
-route_min = float(sys.argv[4])
-final_bearing_max = float(sys.argv[5])
-final_cue_max = float(sys.argv[6])
-catch_altitude_min = float(sys.argv[7])
-hold_sec = float(sys.argv[8])
-runtime_catch_bearing = float(sys.argv[9])
-runtime_catch_cue = float(sys.argv[10])
-
-if not csv_path.exists():
-    print(f"missing CSV artifact: {csv_path}", file=sys.stderr)
-    raise SystemExit(1)
-rows = list(csv.DictReader(csv_path.open()))
-if not rows:
-    print(f"empty CSV artifact: {csv_path}", file=sys.stderr)
-    raise SystemExit(1)
-
-first = rows[0]
-last = rows[-1]
-initial_bearing = float(first["bearing_error_deg"])
-initial_cue = next((float(r["camera_cue_error_deg"]) for r in rows if r["camera_cue_error_deg"] != "nan"), float("nan"))
-route_distance = math.hypot(float(last["rival_x"]) - float(first["rival_x"]), float(last["rival_y"]) - float(first["rival_y"]))
-
-qualifying = []
-for row in rows:
-    cue_value = row["camera_cue_error_deg"]
-    if cue_value == "nan":
-        qualifying.append(False)
-        continue
-    qualifying.append(
-        float(row["bearing_error_deg"]) <= final_bearing_max
-        and float(cue_value) <= final_cue_max
-    )
-
-catch_row = None
-run_start = None
-for index, is_ok in enumerate(qualifying):
-    if is_ok and run_start is None:
-        run_start = index
-    elif not is_ok:
-        run_start = None
-        continue
-    if run_start is not None:
-        duration = float(rows[index]["t_sec"]) - float(rows[run_start]["t_sec"])
-        if duration >= hold_sec:
-            catch_row = rows[run_start]
-            break
-
-if catch_row is None:
-    print("no sustained catch window found in CSV despite runtime catch signal", file=sys.stderr)
-    raise SystemExit(1)
-
-catch_bearing_csv = float(catch_row["bearing_error_deg"])
-catch_cue_csv = float(catch_row["camera_cue_error_deg"])
-catch_altitude_agl = -float(catch_row["own_z"])
-improvement = initial_bearing - catch_bearing_csv
-
-if initial_bearing < initial_min:
-    print(f"initial bearing error {initial_bearing:.3f} deg was below the required {initial_min:.3f} deg", file=sys.stderr)
-    raise SystemExit(1)
-if improvement < improvement_min:
-    print(f"net bearing improvement {improvement:.3f} deg was below the required {improvement_min:.3f} deg", file=sys.stderr)
-    raise SystemExit(1)
-if route_distance < route_min:
-    print(f"rival route distance {route_distance:.3f} m was below the required {route_min:.3f} m", file=sys.stderr)
-    raise SystemExit(1)
-if catch_altitude_agl < catch_altitude_min:
-    print(
-        f"catch altitude {catch_altitude_agl:.3f} m was below the required {catch_altitude_min:.3f} m",
-        file=sys.stderr,
-    )
-    raise SystemExit(1)
-
-print(f"initial_bearing_error_deg={initial_bearing:.3f}")
-print(f"initial_cue_error_deg={initial_cue:.3f}")
-print(f"catch_bearing_error_csv_deg={catch_bearing_csv:.3f}")
-print(f"catch_cue_error_csv_deg={catch_cue_csv:.3f}")
-print(f"catch_altitude_agl_m={catch_altitude_agl:.3f}")
-print(f"net_bearing_improvement_deg={improvement:.3f}")
-print(f"rival_route_distance_m={route_distance:.3f}")
-PY
+  python3 "${ROOT_DIR}/scripts/evaluate-phase6-geometry.py" "${csv_path}" \
+    --initial-bearing-min-deg "${INITIAL_BEARING_ERROR_MIN_DEG}" \
+    --bearing-improvement-min-deg "${BEARING_IMPROVEMENT_MIN_DEG}" \
+    --rival-route-min-distance-m "${RIVAL_MIN_ROUTE_DISTANCE_M}" \
+    --final-bearing-max-deg "${FINAL_BEARING_ERROR_MAX_DEG}" \
+    --final-cue-max-deg "${FINAL_CUE_ERROR_MAX_DEG}" \
+    --catch-min-altitude-m "${CATCH_MIN_ALTITUDE_M}" \
+    --hold-sec "${CUE_HOLD_SEC}" \
+    --initial-range-min-m "${INITIAL_RANGE_MIN_M}" \
+    --range-reduction-min-m "${RANGE_REDUCTION_MIN_M}" \
+    --final-range-max-m "${FINAL_RANGE_MAX_M}"
 }
 
 require_cmd docker
@@ -566,6 +486,9 @@ CUE_HOLD_SEC="${PHASE6_CUE_HOLD_SEC:-1}"
 CUE_ERROR_TIMEOUT_SEC="${PHASE6_CUE_ERROR_TIMEOUT_SEC:-90}"
 CUE_WINDOW_SEC="${PHASE6_CUE_WINDOW_SEC:-55}"
 CATCH_MIN_ALTITUDE_M="${PHASE6_CATCH_MIN_ALTITUDE_M:-10.0}"
+INITIAL_RANGE_MIN_M="${PHASE6_INITIAL_RANGE_MIN_M:-80.0}"
+RANGE_REDUCTION_MIN_M="${PHASE6_RANGE_REDUCTION_MIN_M:-40.0}"
+FINAL_RANGE_MAX_M="${PHASE6_FINAL_RANGE_MAX_M:-60.0}"
 
 SCRIPTED_RIVAL_BEARING_OFFSET_DEG="${PHASE6_SCRIPTED_RIVAL_BEARING_OFFSET_DEG:-60.0}"
 SCRIPTED_RIVAL_DISTANCE_M="${PHASE6_SCRIPTED_RIVAL_DISTANCE_M:-120.0}"
@@ -587,7 +510,7 @@ echo "this checks the scripted moving-rival route-comparison slice:"
 echo "  - plane_01 starts in the maintained single-aircraft runtime"
 echo "  - a scripted rival follows a deterministic moving route"
 echo "  - the guidance stack cues plane_01 toward that rival"
-echo "  - bearing convergence and forward-cone cueing both become sustained acceptance gates"
+echo "  - bearing, forward-cone cueing, and range closure all become sustained acceptance gates"
 echo "  - plane_01 must still catch while airborne and land successfully afterward"
 echo
 
@@ -673,7 +596,11 @@ ros2_exec "
 run_vehicle_command "${ICONOM_VEHICLE_NAMESPACE}" "${COMMAND_TOPIC}" "${COMMAND_ACK_TOPIC}" 'mode_loiter' "${LOITER_LOG}"
 run_status_waiter "${ICONOM_VEHICLE_NAMESPACE}" "${STATUS_TOPIC}" "${STATUS_LOG}" "${STATUS_TIMEOUT_SEC}" "" "${LOITER_NAV_STATE}" ""
 
-echo "step 9: starting the ownship adapter, scripted rival, and guidance nodes"
+echo "step 9: starting the geometry monitor before the scripted rival begins moving"
+ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/cue_geometry_monitor --ros-args -p publish_period_sec:=0.2 -p forward_cone_deg:=${FINAL_CUE_ERROR_MAX_DEG} -p output_csv:='${CONTAINER_CSV_PATH}'" >"${MONITOR_LOG}" 2>&1 &
+MONITOR_PID=$!
+
+echo "step 10: starting the ownship adapter, scripted rival, and guidance nodes"
 ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; export REF_HOST=referee_server; export REF_PORT=45678; export AIRCRAFT_ID='${ICONOM_VEHICLE_NAMESPACE}'; /workspaces/ros2_ws/install/bin/ownship_telemetry_adapter" >"${OWNSHIP_ADAPTER_LOG}" 2>&1 &
 OWNSHIP_ADAPTER_PID=$!
 ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/predictor" >"${PREDICTOR_LOG}" 2>&1 &
@@ -700,9 +627,6 @@ wait_for_topics "$(cat <<TOPICS
 TOPICS
 )" 30
 wait_for_state pursue 30
-echo "step 10: starting the geometry monitor before OFFBOARD cueing"
-ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/cue_geometry_monitor --ros-args -p publish_period_sec:=0.2 -p forward_cone_deg:=${FINAL_CUE_ERROR_MAX_DEG} -p output_csv:='${CONTAINER_CSV_PATH}'" >"${MONITOR_LOG}" 2>&1 &
-MONITOR_PID=$!
 wait_for_topic "${BEARING_ERROR_TOPIC}" 30
 
 echo "step 11: confirming the cueing bridge emits PX4 attitude offboard setpoints"
@@ -749,7 +673,7 @@ run_status_waiter "${ICONOM_VEHICLE_NAMESPACE}" "${STATUS_TOPIC}" "${STATUS_LOG}
 run_land_detected_waiter "${ICONOM_VEHICLE_NAMESPACE}" "${LAND_DETECTED_TOPIC}" "${LAND_DETECTED_LOG}" "${LAND_DETECTED_TIMEOUT_SEC}" 'true'
 
 echo "step 15: validating the recorded route-comparison artifact"
-GEOMETRY_SUMMARY="$(summarize_geometry_csv "${CSV_PATH}" "${CATCH_BEARING_ERROR}" "${CATCH_CUE_ERROR}")"
+GEOMETRY_SUMMARY="$(summarize_geometry_csv "${CSV_PATH}")"
 
 echo "phase-6 scripted cue geometry succeeded"
 echo "${GEOMETRY_SUMMARY}"

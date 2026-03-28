@@ -55,6 +55,7 @@ class CueGeometryMonitor(Node):
                 "rival_x",
                 "rival_y",
                 "rival_z",
+                "rival_yaw_deg",
                 "range_xy_m",
                 "range_3d_m",
                 "los_heading_deg",
@@ -106,6 +107,10 @@ class CueGeometryMonitor(Node):
             self.ownship_state.pose.orientation.z,
             self.ownship_state.pose.orientation.w,
         )
+        rival_yaw = yaw_from_quaternion(
+            self.rival_state.pose.orientation.z,
+            self.rival_state.pose.orientation.w,
+        )
         los_heading = math.atan2(dy, dx) if range_xy > 1e-6 else own_yaw
         bearing_error_deg = abs(math.degrees(wrap_angle(los_heading - own_yaw)))
         cue_error_deg = self.last_cue_error_deg if self.last_cue_error_deg is not None else float("nan")
@@ -125,6 +130,7 @@ class CueGeometryMonitor(Node):
                 f"{rival_pos.x:.3f}",
                 f"{rival_pos.y:.3f}",
                 f"{rival_pos.z:.3f}",
+                f"{math.degrees(rival_yaw):.3f}",
                 f"{range_xy:.3f}",
                 f"{range_3d:.3f}",
                 f"{math.degrees(los_heading):.3f}",

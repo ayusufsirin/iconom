@@ -1,25 +1,35 @@
 # SESSION
 
 ## Goal
-Evaluate whether a minimal rectangular live-rival route for `plane_02` is a useful phase-6 hardening variant before changing the maintained baseline.
+Keep phase-6 hardening truthful by applying angular and range-gated catch definitions to scripted and live geometry checks, and keep the trajectory plot aligned with the recorded geometry fields.
 
 ## Current status
-The standalone `check-phase6-live-rival-geometry.sh` experiment now drives `plane_02` through a minimal four-corner rectangular route while leaving the phase-5/phase-6 guidance stack and `plane_01` control path unchanged. The headless run passes: `plane_01` still achieves an airborne catch against the moving rival and both aircraft land successfully afterward.
+The shared evaluator supports angular and range gates, the scripted and live geometry checks both use it, and the live two-plane check passes with the tighter default rectangular route for `plane_02`. The geometry monitor records `rival_yaw_deg`, and the plotter now requires fresh CSVs with that field so it cannot silently draw line-of-sight bearing as rival heading.
 
 ## Files touched
-- /home/joseph/Projects/iconom/SESSION.md
+- /home/joseph/Projects/iconom/ros2_ws/src/iconom_guidance/iconom_guidance/cue_geometry_monitor.py
+- /home/joseph/Projects/iconom/scripts/evaluate-phase6-geometry.py
+- /home/joseph/Projects/iconom/scripts/check-phase6-scripted-cue-geometry.sh
 - /home/joseph/Projects/iconom/scripts/check-phase6-live-rival-geometry.sh
+- /home/joseph/Projects/iconom/scripts/plot-phase6-scripted-cue-geometry.py
+- /home/joseph/Projects/iconom/README.md
+- /home/joseph/Projects/iconom/SESSION.md
 
 ## Last completed step
-Validated the rectangular-route variant with `./scripts/check-phase6-live-rival-geometry.sh --incremental`; latest passing summary included `initial_bearing_error_deg=111.134`, `catch_bearing_error_deg=12.411`, `catch_cue_error_deg=13.507`, `catch_altitude_agl_m=19.207`, and `rival_route_distance_m=100.528`.
+Tightened the phase-6 geometry tooling so both scripted and live hardening use the shared range-gated evaluator, the live check passes with the maintained rectangular rival route, and the plotter now refuses stale CSVs that lack `rival_yaw_deg` instead of drawing the wrong arrow.
 
 ## Current blocker
 None
 
 ## Next exact step
-Decide whether to keep the rectangular `plane_02` route as an uncommitted experiment, commit it as the new default live-rival geometry path, or run a GUI confirmation first.
+None
 
 ## Validation
+```bash
+cd /home/joseph/Projects/iconom
+./scripts/check-phase6-scripted-cue-geometry.sh --incremental
+```
+
 ```bash
 cd /home/joseph/Projects/iconom
 ./scripts/check-phase6-live-rival-geometry.sh --incremental
@@ -27,10 +37,10 @@ cd /home/joseph/Projects/iconom
 
 ```bash
 cd /home/joseph/Projects/iconom
-xhost +local:docker
-ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-geometry.sh --incremental
+docker compose -f docker-compose.yml run --rm -v /home/joseph/Projects/iconom:/repo ros2_app python3 /repo/scripts/plot-phase6-scripted-cue-geometry.py /repo/ros2_ws/.tmp-phase6-scripted-cue-geometry.csv
 ```
 
 ## Notes
-- This is a minimal rival-only change: `plane_02` motion changed, `plane_01` guidance/controller logic did not.
-- Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, `opencode.json.home_network`, `ros2_ws/.tmp-phase6-live-rival-geometry.csv`, `ros2_ws/.tmp-phase6-live-rival-geometry.csv.svg`, `ros2_ws/.tmp-phase6-scripted-cue-geometry.csv`, and `ros2_ws/.tmp-phase6-scripted-cue-geometry.csv.svg` out of git.
+- Regenerate the `.tmp-phase6-*.csv` artifacts before plotting if they were created before `rival_yaw_deg` was added.
+- The plotter should show blue ownship heading and red rival heading at the catch sample only when the CSV includes `rival_yaw_deg`.
+- Keep `QGroundControl-x86_64.AppImage`, `opencode.json`, `opencode.json.home_network`, and the `.tmp-phase6-*.csv` / `.svg` artifacts out of git.

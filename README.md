@@ -443,7 +443,7 @@ The maintained check now proves:
 
 ## Phase 6 Live-Rival Geometry Hardening
 
-The maintained live-rival cueing slice now also has a stronger standalone hardening check against the real dual-aircraft simulation. It keeps `plane_01` as ownship, uses live `plane_02` state as the rival source, records ownship-versus-rival geometry to CSV, and only passes if a sustained airborne catch occurs before both aircraft land successfully.
+The maintained live-rival cueing slice now also has a stronger standalone hardening check against the real dual-aircraft simulation. It keeps `plane_01` as ownship, uses live `plane_02` state as the rival source, records ownship-versus-rival geometry to CSV, and only passes if a sustained airborne catch occurs with meaningful range closure and final proximity before both aircraft land successfully.
 
 To run the headless live-rival geometry hardening check:
 
@@ -462,7 +462,7 @@ This standalone check is not part of `phase6-acceptance.sh` yet. It exists to ha
 
 ## Phase 6 Scripted Cue Geometry Hardening
 
-The live-rival cueing slice is the maintained phase-6 baseline, but there is also a standalone hardening check for route-comparison evidence against a deterministic moving scripted rival. It keeps `plane_01` as the real simulated ownship, records ownship-versus-rival geometry to CSV, and only passes if a sustained forward-cone catch occurs while `plane_01` is still airborne and then lands cleanly afterward.
+The live-rival cueing slice is the maintained phase-6 baseline, but there is also a standalone hardening check for route-comparison evidence against a deterministic moving scripted rival. It keeps `plane_01` as the real simulated ownship, records ownship-versus-rival geometry to CSV, and only passes if a sustained forward-cone catch occurs while `plane_01` is still airborne, shows meaningful range closure and final proximity to the rival, and then lands cleanly afterward.
 
 To run the headless scripted cue-geometry hardening check:
 
