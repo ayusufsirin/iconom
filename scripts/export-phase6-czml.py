@@ -17,6 +17,8 @@ DEFAULT_ANCHOR_ALT_M = 120.0
 DEFAULT_EPOCH = "2026-01-01T00:00:00Z"
 OWN_COLOR = [21, 101, 192, 255]
 RIVAL_COLOR = [198, 40, 40, 255]
+SELECTED_COLOR = [255, 179, 0, 255]
+INTERCEPT_COLOR = [46, 204, 113, 255]
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,6 +47,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def parse_float(value: str | None) -> float:
+    if value is None or value == "":
+        return float("nan")
+    return float(value)
+
+
 def load_rows(csv_path: Path) -> list[dict[str, float]]:
     rows: list[dict[str, float]] = []
     with csv_path.open(newline="", encoding="utf-8") as handle:
@@ -56,19 +64,28 @@ def load_rows(csv_path: Path) -> list[dict[str, float]]:
         if reader.fieldnames is None or not required.issubset(reader.fieldnames):
             raise SystemExit("CSV is missing required geometry fields for CZML export")
         for raw in reader:
-            rows.append(
-                {
-                    "t_sec": float(raw["t_sec"]),
-                    "own_x": float(raw["own_x"]),
-                    "own_y": float(raw["own_y"]),
-                    "own_z": float(raw["own_z"]),
-                    "own_yaw_deg": float(raw["own_yaw_deg"]),
-                    "rival_x": float(raw["rival_x"]),
-                    "rival_y": float(raw["rival_y"]),
-                    "rival_z": float(raw["rival_z"]),
-                    "rival_yaw_deg": float(raw["rival_yaw_deg"]),
-                }
-            )
+            row = {
+                "t_sec": parse_float(raw.get("t_sec")),
+                "own_x": parse_float(raw.get("own_x")),
+                "own_y": parse_float(raw.get("own_y")),
+                "own_z": parse_float(raw.get("own_z")),
+                "own_yaw_deg": parse_float(raw.get("own_yaw_deg")),
+                "rival_x": parse_float(raw.get("rival_x")),
+                "rival_y": parse_float(raw.get("rival_y")),
+                "rival_z": parse_float(raw.get("rival_z")),
+                "rival_yaw_deg": parse_float(raw.get("rival_yaw_deg")),
+                "selected_x": parse_float(raw.get("selected_x")),
+                "selected_y": parse_float(raw.get("selected_y")),
+                "selected_z": parse_float(raw.get("selected_z")),
+                "selected_yaw_deg": parse_float(raw.get("selected_yaw_deg")),
+                "selected_age_sec": parse_float(raw.get("selected_age_sec")),
+                "intercept_x": parse_float(raw.get("intercept_x")),
+                "intercept_y": parse_float(raw.get("intercept_y")),
+                "intercept_z": parse_float(raw.get("intercept_z")),
+                "intercept_yaw_deg": parse_float(raw.get("intercept_yaw_deg")),
+                "intercept_age_sec": parse_float(raw.get("intercept_age_sec")),
+            }
+            rows.append(row)
     if not rows:
         raise SystemExit("geometry CSV is empty")
     return rows
@@ -91,6 +108,10 @@ def local_offsets_to_wgs84(
     return lon_deg, lat_deg, alt_m
 
 
+def row_has_position(row: dict[str, float], x_key: str, y_key: str, z_key: str) -> bool:
+    return not any(math.isnan(row[key]) for key in (x_key, y_key, z_key))
+
+
 def make_position_series(
     rows: list[dict[str, float]],
     x_key: str,
@@ -102,6 +123,8 @@ def make_position_series(
 ) -> list[float]:
     series: list[float] = []
     for row in rows:
+        if not row_has_position(row, x_key, y_key, z_key):
+            continue
         lon_deg, lat_deg, alt_m = local_offsets_to_wgs84(
             row[x_key],
             row[y_key],
@@ -141,7 +164,10 @@ def make_entity_packet(
     anchor_alt_m: float,
     epoch: str,
     availability: str,
-) -> dict[str, object]:
+) -> dict[str, object] | None:
+    series = make_position_series(rows, x_key, y_key, z_key, anchor_lat_deg, anchor_lon_deg, anchor_alt_m)
+    if not series:
+        return None
     return {
         "id": entity_id,
         "name": name,
@@ -164,15 +190,7 @@ def make_entity_packet(
             "interpolationAlgorithm": "LAGRANGE",
             "interpolationDegree": 1,
             "epoch": epoch,
-            "cartographicDegrees": make_position_series(
-                rows,
-                x_key,
-                y_key,
-                z_key,
-                anchor_lat_deg,
-                anchor_lon_deg,
-                anchor_alt_m,
-            ),
+            "cartographicDegrees": series,
         },
     }
 
@@ -199,7 +217,8 @@ def build_czml(
         anchor_lon_deg,
         anchor_alt_m,
     )
-    return [
+    packets: list[dict[str, object]] = []
+    packets.append(
         {
             "id": "document",
             "name": "Phase 6 Replay",
@@ -211,43 +230,26 @@ def build_czml(
                 "range": "LOOP_STOP",
                 "step": "SYSTEM_CLOCK_MULTIPLIER",
             },
-        },
+        }
+    )
+    packets.append(
         {
             "id": "phase6-view",
             "name": "Replay View",
             "availability": availability,
             "position": {"cartographicDegrees": [view_lon_deg, view_lat_deg, view_alt_m]},
             "viewFrom": {"cartesian": [0.0, -450.0, 220.0]},
-        },
-        make_entity_packet(
-            "ownship",
-            "plane_01 ownship",
-            OWN_COLOR,
-            rows,
-            "own_x",
-            "own_y",
-            "own_z",
-            anchor_lat_deg,
-            anchor_lon_deg,
-            anchor_alt_m,
-            epoch,
-            availability,
-        ),
-        make_entity_packet(
-            "rival",
-            "plane_02 rival",
-            RIVAL_COLOR,
-            rows,
-            "rival_x",
-            "rival_y",
-            "rival_z",
-            anchor_lat_deg,
-            anchor_lon_deg,
-            anchor_alt_m,
-            epoch,
-            availability,
-        ),
-    ]
+        }
+    )
+    for packet in (
+        make_entity_packet("ownship", "plane_01 ownship", OWN_COLOR, rows, "own_x", "own_y", "own_z", anchor_lat_deg, anchor_lon_deg, anchor_alt_m, epoch, availability),
+        make_entity_packet("rival", "plane_02 rival", RIVAL_COLOR, rows, "rival_x", "rival_y", "rival_z", anchor_lat_deg, anchor_lon_deg, anchor_alt_m, epoch, availability),
+        make_entity_packet("selected_target", "selected target", SELECTED_COLOR, rows, "selected_x", "selected_y", "selected_z", anchor_lat_deg, anchor_lon_deg, anchor_alt_m, epoch, availability),
+        make_entity_packet("intercept_target", "intercept target", INTERCEPT_COLOR, rows, "intercept_x", "intercept_y", "intercept_z", anchor_lat_deg, anchor_lon_deg, anchor_alt_m, epoch, availability),
+    ):
+        if packet is not None:
+            packets.append(packet)
+    return packets
 
 
 def main() -> int:

@@ -12,6 +12,8 @@ from std_msgs.msg import Float32
 
 OWNSHIP_STATE_TOPIC = "/competition/ownship/state"
 RIVAL_STATE_TOPIC = "/competition/rival/state"
+SELECTED_TARGET_TOPIC = "/guidance/selected_target"
+INTERCEPT_TARGET_TOPIC = "/guidance/intercept_target"
 CUE_ERROR_TOPIC = "/guidance/camera_cue_error_deg"
 BEARING_ERROR_TOPIC = "/guidance/bearing_error_deg"
 
@@ -22,6 +24,12 @@ def yaw_from_quaternion(z: float, w: float) -> float:
 
 def wrap_angle(angle_rad: float) -> float:
     return math.atan2(math.sin(angle_rad), math.cos(angle_rad))
+
+
+def format_float(value: float) -> str:
+    if math.isnan(value):
+        return "nan"
+    return f"{value:.3f}"
 
 
 class CueGeometryMonitor(Node):
@@ -38,6 +46,10 @@ class CueGeometryMonitor(Node):
 
         self.ownship_state: Optional[PoseStamped] = None
         self.rival_state: Optional[PoseStamped] = None
+        self.selected_target: Optional[PoseStamped] = None
+        self.intercept_target: Optional[PoseStamped] = None
+        self.selected_target_at: Optional[float] = None
+        self.intercept_target_at: Optional[float] = None
         self.last_cue_error_deg: Optional[float] = None
         self.start_time: Optional[float] = None
 
@@ -56,6 +68,18 @@ class CueGeometryMonitor(Node):
                 "rival_y",
                 "rival_z",
                 "rival_yaw_deg",
+                "selected_x",
+                "selected_y",
+                "selected_z",
+                "selected_yaw_deg",
+                "selected_age_sec",
+                "intercept_x",
+                "intercept_y",
+                "intercept_z",
+                "intercept_yaw_deg",
+                "intercept_age_sec",
+                "rival_selected_gap_m",
+                "rival_intercept_gap_m",
                 "range_xy_m",
                 "range_3d_m",
                 "los_heading_deg",
@@ -69,11 +93,13 @@ class CueGeometryMonitor(Node):
         self.bearing_error_pub = self.create_publisher(Float32, BEARING_ERROR_TOPIC, 10)
         self.create_subscription(PoseStamped, OWNSHIP_STATE_TOPIC, self._handle_ownship, 10)
         self.create_subscription(PoseStamped, RIVAL_STATE_TOPIC, self._handle_rival, 10)
+        self.create_subscription(PoseStamped, SELECTED_TARGET_TOPIC, self._handle_selected_target, 10)
+        self.create_subscription(PoseStamped, INTERCEPT_TARGET_TOPIC, self._handle_intercept_target, 10)
         self.create_subscription(Float32, CUE_ERROR_TOPIC, self._handle_cue_error, 10)
         self.timer = self.create_timer(self.publish_period_sec, self._tick)
 
         self.get_logger().info(
-            f"cue geometry monitor listening on {OWNSHIP_STATE_TOPIC}, {RIVAL_STATE_TOPIC}, and {CUE_ERROR_TOPIC}; "
+            f"cue geometry monitor listening on {OWNSHIP_STATE_TOPIC}, {RIVAL_STATE_TOPIC}, {SELECTED_TARGET_TOPIC}, {INTERCEPT_TARGET_TOPIC}, and {CUE_ERROR_TOPIC}; "
             f"publishing bearing error on {BEARING_ERROR_TOPIC} and writing CSV to {self.output_csv}"
         )
 
@@ -83,8 +109,40 @@ class CueGeometryMonitor(Node):
     def _handle_rival(self, msg: PoseStamped) -> None:
         self.rival_state = msg
 
+    def _handle_selected_target(self, msg: PoseStamped) -> None:
+        self.selected_target = msg
+        self.selected_target_at = time.monotonic()
+
+    def _handle_intercept_target(self, msg: PoseStamped) -> None:
+        self.intercept_target = msg
+        self.intercept_target_at = time.monotonic()
+
     def _handle_cue_error(self, msg: Float32) -> None:
         self.last_cue_error_deg = float(msg.data)
+
+    def _pose_fields(
+        self, msg: Optional[PoseStamped], observed_at: Optional[float], now: float
+    ) -> tuple[float, float, float, float, float]:
+        if msg is None or observed_at is None:
+            nan = float("nan")
+            return nan, nan, nan, nan, nan
+        yaw_deg = math.degrees(yaw_from_quaternion(msg.pose.orientation.z, msg.pose.orientation.w))
+        age_sec = max(0.0, now - observed_at)
+        return (
+            float(msg.pose.position.x),
+            float(msg.pose.position.y),
+            float(msg.pose.position.z),
+            yaw_deg,
+            age_sec,
+        )
+
+    def _gap_to_rival_m(self, msg: Optional[PoseStamped]) -> float:
+        if self.rival_state is None or msg is None:
+            return float("nan")
+        dx = float(self.rival_state.pose.position.x - msg.pose.position.x)
+        dy = float(self.rival_state.pose.position.y - msg.pose.position.y)
+        dz = float(self.rival_state.pose.position.z - msg.pose.position.z)
+        return math.sqrt(dx * dx + dy * dy + dz * dz)
 
     def _tick(self) -> None:
         if self.ownship_state is None or self.rival_state is None:
@@ -116,26 +174,47 @@ class CueGeometryMonitor(Node):
         cue_error_deg = self.last_cue_error_deg if self.last_cue_error_deg is not None else float("nan")
         in_forward_cone = int(not math.isnan(cue_error_deg) and cue_error_deg <= self.forward_cone_deg)
 
+        selected_x, selected_y, selected_z, selected_yaw_deg, selected_age_sec = self._pose_fields(
+            self.selected_target, self.selected_target_at, now
+        )
+        intercept_x, intercept_y, intercept_z, intercept_yaw_deg, intercept_age_sec = self._pose_fields(
+            self.intercept_target, self.intercept_target_at, now
+        )
+        rival_selected_gap_m = self._gap_to_rival_m(self.selected_target)
+        rival_intercept_gap_m = self._gap_to_rival_m(self.intercept_target)
+
         bearing_msg = Float32()
         bearing_msg.data = float(bearing_error_deg)
         self.bearing_error_pub.publish(bearing_msg)
 
         self.writer.writerow(
             [
-                f"{t_sec:.3f}",
-                f"{own_pos.x:.3f}",
-                f"{own_pos.y:.3f}",
-                f"{own_pos.z:.3f}",
-                f"{math.degrees(own_yaw):.3f}",
-                f"{rival_pos.x:.3f}",
-                f"{rival_pos.y:.3f}",
-                f"{rival_pos.z:.3f}",
-                f"{math.degrees(rival_yaw):.3f}",
-                f"{range_xy:.3f}",
-                f"{range_3d:.3f}",
-                f"{math.degrees(los_heading):.3f}",
-                f"{bearing_error_deg:.3f}",
-                "nan" if math.isnan(cue_error_deg) else f"{cue_error_deg:.3f}",
+                format_float(t_sec),
+                format_float(float(own_pos.x)),
+                format_float(float(own_pos.y)),
+                format_float(float(own_pos.z)),
+                format_float(math.degrees(own_yaw)),
+                format_float(float(rival_pos.x)),
+                format_float(float(rival_pos.y)),
+                format_float(float(rival_pos.z)),
+                format_float(math.degrees(rival_yaw)),
+                format_float(selected_x),
+                format_float(selected_y),
+                format_float(selected_z),
+                format_float(selected_yaw_deg),
+                format_float(selected_age_sec),
+                format_float(intercept_x),
+                format_float(intercept_y),
+                format_float(intercept_z),
+                format_float(intercept_yaw_deg),
+                format_float(intercept_age_sec),
+                format_float(rival_selected_gap_m),
+                format_float(rival_intercept_gap_m),
+                format_float(range_xy),
+                format_float(range_3d),
+                format_float(math.degrees(los_heading)),
+                format_float(bearing_error_deg),
+                format_float(cue_error_deg),
                 str(in_forward_cone),
             ]
         )
