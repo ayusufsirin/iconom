@@ -13,6 +13,7 @@ Phase 0 is documentation-first. No implementation should begin until the baselin
 - [Phase 3 Plan](./docs/phase-3-plan.md)
 - [Phase 4 Plan](./docs/phase-4-plan.md)
 - [Phase 5 Plan](./docs/phase-5-plan.md)
+- [Phase 6 Controller Scheme](./docs/phase-6-controller.md)
 - [Agent Rules](./AGENTS.md)
 - [Task Template](./docs/task-template.md)
 - [Canonical Compose Stack](./docker-compose.yml)
