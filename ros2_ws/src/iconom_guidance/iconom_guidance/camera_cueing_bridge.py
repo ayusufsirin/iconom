@@ -62,6 +62,17 @@ class CameraCueingBridge(Node):
         self.declare_parameter("range_integral_gain", 0.003)
         self.declare_parameter("range_integral_limit", 30.0)
         self.declare_parameter("closing_speed_filter_alpha", 0.35)
+        self.declare_parameter("closing_speed_kp", 0.12)
+        self.declare_parameter("closing_speed_ki", 0.0)
+        self.declare_parameter("closing_speed_integral_limit", 0.5)
+        self.declare_parameter("capture_closing_speed_max_mps", 6.0)
+        self.declare_parameter("approach_closing_speed_max_mps", 2.5)
+        self.declare_parameter("hold_closing_speed_max_mps", 0.8)
+        self.declare_parameter("recovery_closing_speed_mps", 0.0)
+        self.declare_parameter("longitudinal_outer_gain", 0.5)
+        self.declare_parameter("hold_aft_error_band_m", 1.5)
+        self.declare_parameter("approach_aft_error_band_m", 8.0)
+        self.declare_parameter("recovery_aft_distance_min_m", 0.0)
         self.declare_parameter("target_chase_range_m", 5.0)
         self.declare_parameter("chase_range_tolerance_m", 3.0)
         self.declare_parameter("capture_chase_range_m", 18.0)
@@ -86,6 +97,17 @@ class CameraCueingBridge(Node):
         self.range_integral_gain = float(self.get_parameter("range_integral_gain").value)
         self.range_integral_limit = float(self.get_parameter("range_integral_limit").value)
         self.closing_speed_filter_alpha = float(self.get_parameter("closing_speed_filter_alpha").value)
+        self.closing_speed_kp = float(self.get_parameter("closing_speed_kp").value)
+        self.closing_speed_ki = float(self.get_parameter("closing_speed_ki").value)
+        self.closing_speed_integral_limit = float(self.get_parameter("closing_speed_integral_limit").value)
+        self.capture_closing_speed_max_mps = float(self.get_parameter("capture_closing_speed_max_mps").value)
+        self.approach_closing_speed_max_mps = float(self.get_parameter("approach_closing_speed_max_mps").value)
+        self.hold_closing_speed_max_mps = float(self.get_parameter("hold_closing_speed_max_mps").value)
+        self.recovery_closing_speed_mps = float(self.get_parameter("recovery_closing_speed_mps").value)
+        self.longitudinal_outer_gain = float(self.get_parameter("longitudinal_outer_gain").value)
+        self.hold_aft_error_band_m = float(self.get_parameter("hold_aft_error_band_m").value)
+        self.approach_aft_error_band_m = float(self.get_parameter("approach_aft_error_band_m").value)
+        self.recovery_aft_distance_min_m = float(self.get_parameter("recovery_aft_distance_min_m").value)
         self.target_chase_range_m = float(self.get_parameter("target_chase_range_m").value)
         self.chase_range_tolerance_m = float(self.get_parameter("chase_range_tolerance_m").value)
         self.capture_chase_range_m = float(self.get_parameter("capture_chase_range_m").value)
@@ -109,10 +131,10 @@ class CameraCueingBridge(Node):
         self.selected_target_at: Optional[float] = None
         self.pursuit_state = "idle"
         self.last_log_at = 0.0
-        self.previous_slot_error_m: Optional[float] = None
-        self.previous_range_sample_at: Optional[float] = None
-        self.filtered_slot_error_rate_mps = 0.0
-        self.integrated_slot_error_m = 0.0
+        self.previous_aft_distance_m: Optional[float] = None
+        self.previous_longitudinal_sample_at: Optional[float] = None
+        self.filtered_closing_speed_mps = 0.0
+        self.integrated_speed_error = 0.0
 
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -136,11 +158,11 @@ class CameraCueingBridge(Node):
     def _now(self) -> float:
         return time.monotonic()
 
-    def _reset_range_controller(self) -> None:
-        self.previous_slot_error_m = None
-        self.previous_range_sample_at = None
-        self.filtered_slot_error_rate_mps = 0.0
-        self.integrated_slot_error_m = 0.0
+    def _reset_longitudinal_controller(self) -> None:
+        self.previous_aft_distance_m = None
+        self.previous_longitudinal_sample_at = None
+        self.filtered_closing_speed_mps = 0.0
+        self.integrated_speed_error = 0.0
 
     def _handle_ownship_state(self, msg: PoseStamped) -> None:
         self.ownship_state = msg
@@ -152,7 +174,7 @@ class CameraCueingBridge(Node):
     def _handle_pursuit_state(self, msg: String) -> None:
         self.pursuit_state = msg.data.strip().lower()
         if self.pursuit_state != STATE_PURSUE:
-            self._reset_range_controller()
+            self._reset_longitudinal_controller()
 
     def _target_fresh(self) -> bool:
         return (
@@ -242,27 +264,86 @@ class CameraCueingBridge(Node):
         dz = float(slot[2] - own.z)
         return math.sqrt(dx * dx + dy * dy + dz * dz)
 
-    def _estimate_slot_error_rate_mps(self, slot_error_m: Optional[float]) -> tuple[float, float]:
-        if slot_error_m is None:
-            self._reset_range_controller()
+    def _current_aft_distance_m(self) -> Optional[float]:
+        if self.ownship_state is None or not self._target_fresh() or self.selected_target is None:
+            return None
+
+        target_heading = self._target_heading_rad()
+        if target_heading is None:
+            return None
+
+        own = self.ownship_state.pose.position
+        target = self.selected_target.pose.position
+        dx = float(own.x - target.x)
+        dy = float(own.y - target.y)
+        tx = math.cos(target_heading)
+        ty = math.sin(target_heading)
+        return -(dx * tx + dy * ty)
+
+    def _estimate_closing_speed_mps(self, aft_distance_m: Optional[float]) -> tuple[float, float]:
+        if aft_distance_m is None:
+            self._reset_longitudinal_controller()
             return 0.0, 0.0
 
         now = self._now()
-        if self.previous_slot_error_m is None or self.previous_range_sample_at is None:
-            self.previous_slot_error_m = slot_error_m
-            self.previous_range_sample_at = now
-            self.filtered_slot_error_rate_mps = 0.0
+        if self.previous_aft_distance_m is None or self.previous_longitudinal_sample_at is None:
+            self.previous_aft_distance_m = aft_distance_m
+            self.previous_longitudinal_sample_at = now
+            self.filtered_closing_speed_mps = 0.0
             return 0.0, 0.0
 
-        dt = max(1e-3, now - self.previous_range_sample_at)
-        raw_slot_error_rate_mps = (slot_error_m - self.previous_slot_error_m) / dt
+        dt = now - self.previous_longitudinal_sample_at
+        if dt <= 0.0:
+            self._reset_longitudinal_controller()
+            return 0.0, 0.0
+
+        raw_aft_rate_mps = (aft_distance_m - self.previous_aft_distance_m) / dt
+        raw_closing_speed_mps = -raw_aft_rate_mps
         alpha = clamp(self.closing_speed_filter_alpha, 0.0, 1.0)
-        self.filtered_slot_error_rate_mps = (
-            (1.0 - alpha) * self.filtered_slot_error_rate_mps + alpha * raw_slot_error_rate_mps
+        self.filtered_closing_speed_mps = (
+            (1.0 - alpha) * self.filtered_closing_speed_mps + alpha * raw_closing_speed_mps
         )
-        self.previous_slot_error_m = slot_error_m
-        self.previous_range_sample_at = now
-        return self.filtered_slot_error_rate_mps, dt
+        self.previous_aft_distance_m = aft_distance_m
+        self.previous_longitudinal_sample_at = now
+        return self.filtered_closing_speed_mps, dt
+
+    def _longitudinal_mode(self, aft_distance_m: float, desired_aft_m: float) -> str:
+        aft_error_m = aft_distance_m - desired_aft_m
+        if aft_distance_m < self.recovery_aft_distance_min_m:
+            return "recovery"
+        if aft_error_m <= self.hold_aft_error_band_m:
+            return "hold"
+        if aft_error_m <= self.approach_aft_error_band_m:
+            return "approach"
+        return "capture"
+
+    def _overshoot_risk(self, aft_distance_m: float, desired_aft_m: float, closing_speed_mps: float) -> bool:
+        remaining_margin_m = aft_distance_m - desired_aft_m
+        return (
+            aft_distance_m < self.recovery_aft_distance_min_m
+            or (remaining_margin_m <= 0.0 and closing_speed_mps > 0.5)
+        )
+
+    def _desired_closing_speed_mps(self, aft_error_m: float, mode: str) -> float:
+        if mode == "recovery":
+            return self.recovery_closing_speed_mps
+        if mode == "capture":
+            return clamp(
+                self.longitudinal_outer_gain * aft_error_m,
+                0.0,
+                self.capture_closing_speed_max_mps,
+            )
+        if mode == "approach":
+            return clamp(
+                self.longitudinal_outer_gain * aft_error_m,
+                0.0,
+                self.approach_closing_speed_max_mps,
+            )
+        return clamp(
+            0.4 * self.longitudinal_outer_gain * aft_error_m,
+            0.0,
+            self.hold_closing_speed_max_mps,
+        )
 
     def _signed_heading_error_rad(self) -> Optional[float]:
         if self.ownship_state is None:
@@ -306,45 +387,47 @@ class CameraCueingBridge(Node):
         commanded_pitch = self.base_pitch_rad + self.pitch_angle_gain * altitude_error
         return clamp(commanded_pitch, -self.max_pitch_rad, self.max_pitch_rad)
 
-    def _compute_thrust_x(
-        self, range_to_target_m: Optional[float], range_to_slot_m: Optional[float]
-    ) -> tuple[float, float, float]:
-        if range_to_slot_m is None:
-            self._reset_range_controller()
-            return self.max_thrust_x, 0.0, 0.0
+    def _compute_thrust_x(self, range_to_target_m: Optional[float]) -> tuple[float, float, float, float, str]:
+        aft_distance_m = self._current_aft_distance_m()
+        if aft_distance_m is None:
+            self._reset_longitudinal_controller()
+            return self.max_thrust_x, 0.0, 0.0, 0.0, "unavailable"
 
-        in_tail_chase = self._tail_chase_ready()
-        slot_error_rate_mps, dt = self._estimate_slot_error_rate_mps(range_to_slot_m)
+        desired_aft_m = self._active_chase_range_m(range_to_target_m)
+        aft_error_m = aft_distance_m - desired_aft_m
+        closing_speed_mps, dt = self._estimate_closing_speed_mps(aft_distance_m)
+        mode = self._longitudinal_mode(aft_distance_m, desired_aft_m)
+        overshoot_risk = self._overshoot_risk(aft_distance_m, desired_aft_m, closing_speed_mps)
+        desired_closing_speed_mps = self._desired_closing_speed_mps(aft_error_m, mode)
 
+        if mode == "recovery" or overshoot_risk:
+            self.integrated_speed_error *= 0.5
+            return (
+                self.min_thrust_x,
+                aft_distance_m,
+                closing_speed_mps,
+                desired_closing_speed_mps,
+                mode,
+            )
+
+        speed_error = desired_closing_speed_mps - closing_speed_mps
         if dt > 0.0:
-            if in_tail_chase or range_to_slot_m <= self.capture_chase_range_m:
-                self.integrated_slot_error_m = clamp(
-                    self.integrated_slot_error_m + range_to_slot_m * dt,
-                    -self.range_integral_limit,
-                    self.range_integral_limit,
-                )
-            else:
-                self.integrated_slot_error_m *= 0.9
+            self.integrated_speed_error = clamp(
+                self.integrated_speed_error + speed_error * dt,
+                -self.closing_speed_integral_limit,
+                self.closing_speed_integral_limit,
+            )
 
-        integral_term = self.range_integral_gain * self.integrated_slot_error_m
-
-        if in_tail_chase and range_to_slot_m <= (0.5 * self.chase_range_tolerance_m):
-            self.integrated_slot_error_m *= 0.8
-            return self.min_thrust_x, slot_error_rate_mps, integral_term
-
-        slot_error = range_to_slot_m
-        proportional_term = self.range_thrust_gain * slot_error
-        if in_tail_chase and range_to_slot_m <= (2.0 * self.chase_range_tolerance_m):
-            proportional_term *= 0.5
-
-        derivative_term = self.range_damping_gain * slot_error_rate_mps
-        if not in_tail_chase and range_to_slot_m > self.capture_chase_range_m:
-            derivative_term *= 0.35
-        elif in_tail_chase and range_to_slot_m > (2.0 * self.chase_range_tolerance_m):
-            derivative_term *= 0.6
-
-        commanded = self.min_thrust_x + proportional_term + integral_term + derivative_term
-        return clamp(commanded, self.min_thrust_x, self.max_thrust_x), slot_error_rate_mps, integral_term
+        proportional_term = self.closing_speed_kp * speed_error
+        integral_term = self.closing_speed_ki * self.integrated_speed_error
+        commanded = self.min_thrust_x + proportional_term + integral_term
+        return (
+            clamp(commanded, self.min_thrust_x, self.max_thrust_x),
+            aft_distance_m,
+            closing_speed_mps,
+            desired_closing_speed_mps,
+            mode,
+        )
 
     def _publish_offboard_setpoint(self, error_rad: float) -> None:
         if self.pursuit_state != STATE_PURSUE:
@@ -396,7 +479,9 @@ class CameraCueingBridge(Node):
             else:
                 desired_yaw = wrap_angle(own_heading + error_rad)
 
-        thrust_x, slot_error_rate_mps, integral_term = self._compute_thrust_x(range_to_target_m, range_to_slot_m)
+        thrust_x, aft_distance_m, closing_speed_mps, desired_closing_speed_mps, longitudinal_mode = (
+            self._compute_thrust_x(range_to_target_m)
+        )
 
         attitude = VehicleAttitudeSetpoint()
         attitude.timestamp = self.get_clock().now().nanoseconds // 1000
@@ -421,8 +506,10 @@ class CameraCueingBridge(Node):
                     f" tail_angle_deg={tail_angle_deg:.1f}"
                     f" heading_alignment_deg={heading_alignment_error_deg:.1f}"
                     f" active_range_m={active_range:.1f}"
-                    f" slot_error_rate_mps={slot_error_rate_mps:.2f}"
-                    f" integral_term={integral_term:.3f}"
+                    f" aft_distance_m={aft_distance_m:.1f}"
+                    f" closing_speed_mps={closing_speed_mps:.2f}"
+                    f" desired_closing_speed_mps={desired_closing_speed_mps:.2f}"
+                    f" longitudinal_mode={longitudinal_mode}"
                 )
             self.get_logger().info(
                 f"published trailing-slot cueing setpoint with cue_error_deg={cue_error_deg:.1f}"
@@ -434,7 +521,7 @@ class CameraCueingBridge(Node):
         error_rad = self._signed_heading_error_rad()
         self._publish_cue_error(error_rad)
         if error_rad is None:
-            self._reset_range_controller()
+            self._reset_longitudinal_controller()
             return
         self._publish_offboard_setpoint(error_rad)
 
