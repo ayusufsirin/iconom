@@ -520,6 +520,9 @@ PLANE2_ROUTE_GROUNDSPEED_M_S="${PHASE6_LIVE_RIVAL_RECT_GROUNDSPEED_M_S:-12.0}"
 CUE_THRUST_X="${PHASE6_CUE_THRUST_X:-0.66}"
 CUE_MIN_THRUST_X="${PHASE6_CUE_MIN_THRUST_X:-0.36}"
 CUE_RANGE_THRUST_GAIN="${PHASE6_CUE_RANGE_THRUST_GAIN:-0.02}"
+CUE_RANGE_DAMPING_GAIN="${PHASE6_CUE_RANGE_DAMPING_GAIN:-0.04}"
+CUE_RANGE_INTEGRAL_GAIN="${PHASE6_CUE_RANGE_INTEGRAL_GAIN:-0.015}"
+CUE_RANGE_INTEGRAL_LIMIT="${PHASE6_CUE_RANGE_INTEGRAL_LIMIT:-120.0}"
 TARGET_CHASE_RANGE_M="${PHASE6_TARGET_CHASE_RANGE_M:-5.0}"
 CHASE_RANGE_TOLERANCE_M="${PHASE6_CHASE_RANGE_TOLERANCE_M:-5.0}"
 CUE_ROLL_ANGLE_GAIN="${PHASE6_CUE_ROLL_ANGLE_GAIN:-0.80}"
@@ -672,7 +675,7 @@ ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source 
 PLANNER_PID=$!
 ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/pursuit_state_machine" >"${STATE_MACHINE_LOG}" 2>&1 &
 STATE_MACHINE_PID=$!
-ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/camera_cueing_bridge --ros-args -p vehicle_namespace:='${PLANE1_NAMESPACE}' -p publish_rate_hz:=20.0 -p thrust_x:=${CUE_THRUST_X} -p roll_angle_gain:=${CUE_ROLL_ANGLE_GAIN} -p max_roll_deg:=${CUE_MAX_ROLL_DEG} -p pitch_angle_deg:=${CUE_PITCH_ANGLE_DEG} -p pitch_angle_gain:=${CUE_PITCH_ANGLE_GAIN} -p max_pitch_deg:=${CUE_MAX_PITCH_DEG} -p altitude_error_deadband_m:=${CUE_ALTITUDE_ERROR_DEADBAND_M} -p min_thrust_x:=${CUE_MIN_THRUST_X} -p range_thrust_gain:=${CUE_RANGE_THRUST_GAIN} -p target_chase_range_m:=${TARGET_CHASE_RANGE_M} -p chase_range_tolerance_m:=${CHASE_RANGE_TOLERANCE_M} -p capture_error_deg:=${CUE_CAPTURE_ERROR_DEG}" >"${CUEING_LOG}" 2>&1 &
+ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/camera_cueing_bridge --ros-args -p vehicle_namespace:='${PLANE1_NAMESPACE}' -p publish_rate_hz:=20.0 -p thrust_x:=${CUE_THRUST_X} -p roll_angle_gain:=${CUE_ROLL_ANGLE_GAIN} -p max_roll_deg:=${CUE_MAX_ROLL_DEG} -p pitch_angle_deg:=${CUE_PITCH_ANGLE_DEG} -p pitch_angle_gain:=${CUE_PITCH_ANGLE_GAIN} -p max_pitch_deg:=${CUE_MAX_PITCH_DEG} -p altitude_error_deadband_m:=${CUE_ALTITUDE_ERROR_DEADBAND_M} -p min_thrust_x:=${CUE_MIN_THRUST_X} -p range_thrust_gain:=${CUE_RANGE_THRUST_GAIN} -p range_damping_gain:=${CUE_RANGE_DAMPING_GAIN} -p range_integral_gain:=${CUE_RANGE_INTEGRAL_GAIN} -p range_integral_limit:=${CUE_RANGE_INTEGRAL_LIMIT} -p target_chase_range_m:=${TARGET_CHASE_RANGE_M} -p chase_range_tolerance_m:=${CHASE_RANGE_TOLERANCE_M} -p capture_error_deg:=${CUE_CAPTURE_ERROR_DEG}" >"${CUEING_LOG}" 2>&1 &
 CUEING_PID=$!
 
 wait_for_topics $'/competition/ownship/state\n/competition/rival/state\n/competition/prediction/rival_position\n/guidance/selected_target\n/guidance/intercept_target\n/guidance/pursuit_state\n/guidance/camera_cue_error_deg' 30

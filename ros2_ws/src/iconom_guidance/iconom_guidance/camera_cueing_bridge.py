@@ -59,6 +59,8 @@ class CameraCueingBridge(Node):
         self.declare_parameter("min_thrust_x", 0.36)
         self.declare_parameter("range_thrust_gain", 0.02)
         self.declare_parameter("range_damping_gain", 0.04)
+        self.declare_parameter("range_integral_gain", 0.003)
+        self.declare_parameter("range_integral_limit", 30.0)
         self.declare_parameter("closing_speed_filter_alpha", 0.35)
         self.declare_parameter("target_chase_range_m", 5.0)
         self.declare_parameter("chase_range_tolerance_m", 3.0)
@@ -81,6 +83,8 @@ class CameraCueingBridge(Node):
         self.min_thrust_x = float(self.get_parameter("min_thrust_x").value)
         self.range_thrust_gain = float(self.get_parameter("range_thrust_gain").value)
         self.range_damping_gain = float(self.get_parameter("range_damping_gain").value)
+        self.range_integral_gain = float(self.get_parameter("range_integral_gain").value)
+        self.range_integral_limit = float(self.get_parameter("range_integral_limit").value)
         self.closing_speed_filter_alpha = float(self.get_parameter("closing_speed_filter_alpha").value)
         self.target_chase_range_m = float(self.get_parameter("target_chase_range_m").value)
         self.chase_range_tolerance_m = float(self.get_parameter("chase_range_tolerance_m").value)
@@ -105,9 +109,10 @@ class CameraCueingBridge(Node):
         self.selected_target_at: Optional[float] = None
         self.pursuit_state = "idle"
         self.last_log_at = 0.0
-        self.previous_range_to_target_m: Optional[float] = None
+        self.previous_slot_error_m: Optional[float] = None
         self.previous_range_sample_at: Optional[float] = None
-        self.filtered_closing_speed_mps = 0.0
+        self.filtered_slot_error_rate_mps = 0.0
+        self.integrated_slot_error_m = 0.0
 
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -132,9 +137,10 @@ class CameraCueingBridge(Node):
         return time.monotonic()
 
     def _reset_range_controller(self) -> None:
-        self.previous_range_to_target_m = None
+        self.previous_slot_error_m = None
         self.previous_range_sample_at = None
-        self.filtered_closing_speed_mps = 0.0
+        self.filtered_slot_error_rate_mps = 0.0
+        self.integrated_slot_error_m = 0.0
 
     def _handle_ownship_state(self, msg: PoseStamped) -> None:
         self.ownship_state = msg
@@ -236,27 +242,27 @@ class CameraCueingBridge(Node):
         dz = float(slot[2] - own.z)
         return math.sqrt(dx * dx + dy * dy + dz * dz)
 
-    def _estimate_closing_speed_mps(self, range_to_target_m: Optional[float]) -> float:
-        if range_to_target_m is None:
+    def _estimate_slot_error_rate_mps(self, slot_error_m: Optional[float]) -> tuple[float, float]:
+        if slot_error_m is None:
             self._reset_range_controller()
-            return 0.0
+            return 0.0, 0.0
 
         now = self._now()
-        if self.previous_range_to_target_m is None or self.previous_range_sample_at is None:
-            self.previous_range_to_target_m = range_to_target_m
+        if self.previous_slot_error_m is None or self.previous_range_sample_at is None:
+            self.previous_slot_error_m = slot_error_m
             self.previous_range_sample_at = now
-            self.filtered_closing_speed_mps = 0.0
-            return 0.0
+            self.filtered_slot_error_rate_mps = 0.0
+            return 0.0, 0.0
 
         dt = max(1e-3, now - self.previous_range_sample_at)
-        raw_closing_speed_mps = max(0.0, (self.previous_range_to_target_m - range_to_target_m) / dt)
+        raw_slot_error_rate_mps = (slot_error_m - self.previous_slot_error_m) / dt
         alpha = clamp(self.closing_speed_filter_alpha, 0.0, 1.0)
-        self.filtered_closing_speed_mps = (
-            (1.0 - alpha) * self.filtered_closing_speed_mps + alpha * raw_closing_speed_mps
+        self.filtered_slot_error_rate_mps = (
+            (1.0 - alpha) * self.filtered_slot_error_rate_mps + alpha * raw_slot_error_rate_mps
         )
-        self.previous_range_to_target_m = range_to_target_m
+        self.previous_slot_error_m = slot_error_m
         self.previous_range_sample_at = now
-        return self.filtered_closing_speed_mps
+        return self.filtered_slot_error_rate_mps, dt
 
     def _signed_heading_error_rad(self) -> Optional[float]:
         if self.ownship_state is None:
@@ -302,40 +308,43 @@ class CameraCueingBridge(Node):
 
     def _compute_thrust_x(
         self, range_to_target_m: Optional[float], range_to_slot_m: Optional[float]
-    ) -> tuple[float, float]:
+    ) -> tuple[float, float, float]:
         if range_to_slot_m is None:
             self._reset_range_controller()
-            return self.max_thrust_x, 0.0
+            return self.max_thrust_x, 0.0, 0.0
 
         in_tail_chase = self._tail_chase_ready()
-        closing_speed_mps = self._estimate_closing_speed_mps(range_to_slot_m)
+        slot_error_rate_mps, dt = self._estimate_slot_error_rate_mps(range_to_slot_m)
 
-        if in_tail_chase and range_to_slot_m <= (1.0 * self.chase_range_tolerance_m):
-            return self.min_thrust_x, closing_speed_mps
+        if dt > 0.0:
+            if in_tail_chase or range_to_slot_m <= self.capture_chase_range_m:
+                self.integrated_slot_error_m = clamp(
+                    self.integrated_slot_error_m + range_to_slot_m * dt,
+                    -self.range_integral_limit,
+                    self.range_integral_limit,
+                )
+            else:
+                self.integrated_slot_error_m *= 0.9
+
+        integral_term = self.range_integral_gain * self.integrated_slot_error_m
+
+        if in_tail_chase and range_to_slot_m <= (0.5 * self.chase_range_tolerance_m):
+            self.integrated_slot_error_m *= 0.8
+            return self.min_thrust_x, slot_error_rate_mps, integral_term
 
         slot_error = range_to_slot_m
+        proportional_term = self.range_thrust_gain * slot_error
         if in_tail_chase and range_to_slot_m <= (2.0 * self.chase_range_tolerance_m):
-            proportional_term = 0.5 * self.range_thrust_gain * slot_error
-        else:
-            proportional_term = self.range_thrust_gain * slot_error
+            proportional_term *= 0.5
 
-        damping_scale = 1.0
-        if in_tail_chase and range_to_slot_m > (4.0 * self.chase_range_tolerance_m):
-            damping_scale = 0.35
+        derivative_term = self.range_damping_gain * slot_error_rate_mps
+        if not in_tail_chase and range_to_slot_m > self.capture_chase_range_m:
+            derivative_term *= 0.35
         elif in_tail_chase and range_to_slot_m > (2.0 * self.chase_range_tolerance_m):
-            damping_scale = 0.6
+            derivative_term *= 0.6
 
-        commanded = self.min_thrust_x + proportional_term - (
-            damping_scale * self.range_damping_gain * closing_speed_mps
-        )
-
-        if (
-            range_to_target_m is not None
-            and range_to_target_m <= (self.target_chase_range_m + self.chase_range_tolerance_m)
-        ):
-            commanded = min(commanded, self.min_thrust_x)
-
-        return clamp(commanded, self.min_thrust_x, self.max_thrust_x), closing_speed_mps
+        commanded = self.min_thrust_x + proportional_term + integral_term + derivative_term
+        return clamp(commanded, self.min_thrust_x, self.max_thrust_x), slot_error_rate_mps, integral_term
 
     def _publish_offboard_setpoint(self, error_rad: float) -> None:
         if self.pursuit_state != STATE_PURSUE:
@@ -387,7 +396,7 @@ class CameraCueingBridge(Node):
             else:
                 desired_yaw = wrap_angle(own_heading + error_rad)
 
-        thrust_x, closing_speed_mps = self._compute_thrust_x(range_to_target_m, range_to_slot_m)
+        thrust_x, slot_error_rate_mps, integral_term = self._compute_thrust_x(range_to_target_m, range_to_slot_m)
 
         attitude = VehicleAttitudeSetpoint()
         attitude.timestamp = self.get_clock().now().nanoseconds // 1000
@@ -412,7 +421,8 @@ class CameraCueingBridge(Node):
                     f" tail_angle_deg={tail_angle_deg:.1f}"
                     f" heading_alignment_deg={heading_alignment_error_deg:.1f}"
                     f" active_range_m={active_range:.1f}"
-                    f" closing_speed_mps={closing_speed_mps:.2f}"
+                    f" slot_error_rate_mps={slot_error_rate_mps:.2f}"
+                    f" integral_term={integral_term:.3f}"
                 )
             self.get_logger().info(
                 f"published trailing-slot cueing setpoint with cue_error_deg={cue_error_deg:.1f}"

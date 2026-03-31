@@ -136,6 +136,130 @@ The longitudinal branch is the part under active tuning. It currently uses:
 
 This is the branch most likely responsible for the current settle-too-far-back versus overshoot tradeoff.
 
+## Longitudinal Feedback Loop
+
+The implemented longitudinal controller is easier to reason about as a discrete-time loop around the virtual trailing slot.
+
+Important current fact:
+
+- the controller does not regulate raw rival distance directly
+- it regulates distance from ownship to the virtual trailing slot
+- the desired `5 m` follow spacing is encoded by where the slot is placed, not by subtracting `5 m` inside the PID equation
+
+```mermaid
+flowchart LR
+    A[selected target pose] --> B[slot generator]
+    C[tail-chase gate] --> B
+    B --> D[virtual trailing slot position]
+    E[ownship state k] --> F[slot range measurement]
+    D --> F
+    F --> G[error signal: slot_range_k]
+    G --> H[P term]
+    G --> I[integrator]
+    G --> J[error-rate estimator]
+    J --> K[low-pass filter]
+    K --> L[D term]
+    H --> M[sum + thrust floor]
+    I --> M
+    L --> M
+    M --> N[clamp to min_thrust_x .. thrust_x]
+    N --> O[PX4 attitude setpoint thrust_body x]
+    O --> P[PX4 + aircraft longitudinal response]
+    P --> E
+```
+
+### Discrete Update Equations
+
+At sample index `k`, with controller period `T = dt`:
+
+```mermaid
+flowchart LR
+    A[slot range sample] --> B[P gain]
+    A --> C[discrete integrator]
+    A --> D[backward difference]
+    D --> E[raw error-rate]
+    E --> F[low-pass filter]
+    F --> G[filtered error-rate]
+    C --> H[integral clamp]
+    H --> I[I gain]
+    G --> J[D gain]
+    B --> K[sum with thrust floor]
+    I --> K
+    J --> K
+    K --> L[output scheduling and clamp]
+    L --> M[commanded thrust]
+```
+
+```mermaid
+flowchart TD
+    A[current slot range] --> B{capture or follow active?}
+    B -->|yes| C[accumulate integral]
+    B -->|no| D[decay integral]
+    A --> E[compute raw error-rate]
+    E --> F[filter error-rate]
+    C --> G[scale integral term]
+    D --> G
+    A --> H[scale proportional term]
+    F --> I[scale derivative term]
+    H --> J[sum P I D with thrust floor]
+    G --> J
+    I --> J
+    J --> K[saturate thrust command]
+```
+
+- slot range measurement: `s_k = ||slot_k - ownship_k||`
+- raw slot-error rate: `r_raw_k = (s_k - s_{k-1}) / dt`
+- filtered slot-error rate: `r_filt_k = (1 - alpha) * r_filt_{k-1} + alpha * r_raw_k`
+- integral state in active capture/follow: `I_k = clamp(I_{k-1} + s_k * dt, -I_lim, I_lim)`
+- integral state outside active capture/follow: `I_k = 0.9 * I_{k-1}`
+- proportional term: `P_k = Kp * s_k`
+- integral term: `U_I_k = Ki * I_k`
+- derivative term before scheduling: `U_D_k = Kd * r_filt_k`
+- unsaturated thrust: `u_raw_k = min_thrust_x + P_k + U_I_k + U_D_k`
+- commanded thrust: `u_k = clamp(u_raw_k, min_thrust_x, thrust_x)`
+
+This is why the current controller is best described as PI/PID-like on slot range, not on rival range.
+
+### Implemented Gain Scheduling
+
+The current longitudinal loop is not a plain fixed-gain PID. It includes these implemented nonlinear pieces:
+
+- slot generation switches between capture spacing and follow spacing
+- proportional term is halved near the final band in valid tail chase
+- derivative term is scaled down when far away and not yet in tail chase
+- derivative term is also scaled down when in tail chase but still outside the near band
+- integral state only grows during active capture/follow and otherwise decays
+- if ownship is deep inside the final slot band during valid tail chase, the controller returns `min_thrust_x` directly
+
+```mermaid
+flowchart TD
+    A[slot range and chase geometry] --> B{tail chase ready?}
+    B -->|no| C[capture spacing active]
+    B -->|yes| D[follow spacing active]
+    C --> E[full P term]
+    D --> F{inside near band?}
+    F -->|no| G[reduced D scaling]
+    F -->|yes| H[halve P term]
+    H --> I{inside deep hold band?}
+    I -->|yes| J[force min_thrust_x]
+    I -->|no| K[normal clamp output]
+    E --> K
+    G --> K
+```
+
+### Simulink-Style Interpretation
+
+A Simulink-style reading of the implemented controller is:
+
+- reference model: selected-target to trailing-slot generator
+- measurement block: ownship-to-slot distance
+- derivative block: backward difference plus first-order low-pass filter
+- integral block: discrete accumulator with clamp and conditional decay
+- output nonlinearity: thrust saturation plus near-band thrust-floor override
+- plant: PX4 inner loop plus fixed-wing airframe longitudinal dynamics
+
+So the current tuning problem is not only choosing `Kp`, `Ki`, and `Kd`. It is also choosing them around a scheduled, saturated, sampled-data loop whose reference point moves with the rival.
+
 ## Tail-Chase Gating
 
 The controller does not switch into the final short spacing immediately. It first checks whether ownship is already in acceptable rear-aspect geometry.
