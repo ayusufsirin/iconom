@@ -8,7 +8,7 @@ from typing import Optional
 import rclpy
 from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, String
 
 OWNSHIP_STATE_TOPIC = "/competition/ownship/state"
 RIVAL_STATE_TOPIC = "/competition/rival/state"
@@ -16,6 +16,8 @@ SELECTED_TARGET_TOPIC = "/guidance/selected_target"
 INTERCEPT_TARGET_TOPIC = "/guidance/intercept_target"
 CUE_ERROR_TOPIC = "/guidance/camera_cue_error_deg"
 BEARING_ERROR_TOPIC = "/guidance/bearing_error_deg"
+LONGITUDINAL_PHASE_TOPIC = "/guidance/longitudinal_phase"
+SPACING_MODE_TOPIC = "/guidance/spacing_mode"
 
 
 def yaw_from_quaternion(z: float, w: float) -> float:
@@ -51,6 +53,8 @@ class CueGeometryMonitor(Node):
         self.selected_target_at: Optional[float] = None
         self.intercept_target_at: Optional[float] = None
         self.last_cue_error_deg: Optional[float] = None
+        self.longitudinal_phase = "unavailable"
+        self.spacing_mode = "unavailable"
         self.start_time: Optional[float] = None
 
         output_path = Path(self.output_csv)
@@ -85,6 +89,8 @@ class CueGeometryMonitor(Node):
                 "los_heading_deg",
                 "bearing_error_deg",
                 "camera_cue_error_deg",
+                "longitudinal_phase",
+                "spacing_mode",
                 "in_forward_cone",
             ]
         )
@@ -96,10 +102,12 @@ class CueGeometryMonitor(Node):
         self.create_subscription(PoseStamped, SELECTED_TARGET_TOPIC, self._handle_selected_target, 10)
         self.create_subscription(PoseStamped, INTERCEPT_TARGET_TOPIC, self._handle_intercept_target, 10)
         self.create_subscription(Float32, CUE_ERROR_TOPIC, self._handle_cue_error, 10)
+        self.create_subscription(String, LONGITUDINAL_PHASE_TOPIC, self._handle_longitudinal_phase, 10)
+        self.create_subscription(String, SPACING_MODE_TOPIC, self._handle_spacing_mode, 10)
         self.timer = self.create_timer(self.publish_period_sec, self._tick)
 
         self.get_logger().info(
-            f"cue geometry monitor listening on {OWNSHIP_STATE_TOPIC}, {RIVAL_STATE_TOPIC}, {SELECTED_TARGET_TOPIC}, {INTERCEPT_TARGET_TOPIC}, and {CUE_ERROR_TOPIC}; "
+            f"cue geometry monitor listening on {OWNSHIP_STATE_TOPIC}, {RIVAL_STATE_TOPIC}, {SELECTED_TARGET_TOPIC}, {INTERCEPT_TARGET_TOPIC}, {CUE_ERROR_TOPIC}, {LONGITUDINAL_PHASE_TOPIC}, and {SPACING_MODE_TOPIC}; "
             f"publishing bearing error on {BEARING_ERROR_TOPIC} and writing CSV to {self.output_csv}"
         )
 
@@ -119,6 +127,12 @@ class CueGeometryMonitor(Node):
 
     def _handle_cue_error(self, msg: Float32) -> None:
         self.last_cue_error_deg = float(msg.data)
+
+    def _handle_longitudinal_phase(self, msg: String) -> None:
+        self.longitudinal_phase = msg.data.strip() or "unavailable"
+
+    def _handle_spacing_mode(self, msg: String) -> None:
+        self.spacing_mode = msg.data.strip() or "unavailable"
 
     def _pose_fields(
         self, msg: Optional[PoseStamped], observed_at: Optional[float], now: float
@@ -215,6 +229,8 @@ class CueGeometryMonitor(Node):
                 format_float(math.degrees(los_heading)),
                 format_float(bearing_error_deg),
                 format_float(cue_error_deg),
+                self.longitudinal_phase,
+                self.spacing_mode,
                 str(in_forward_cone),
             ]
         )

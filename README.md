@@ -530,6 +530,14 @@ To open a local Cesium viewer with drag-drop and same-origin path loading:
 
 Then open `http://127.0.0.1:8765/docs/phase6-czml-viewer.html` and either drag a `.czml` file into the page or load `/ros2_ws/.tmp-phase6-live-rival-geometry.csv.czml` directly inside the viewer.
 
+To run the planned five-case PD tuning batch on the unchanged live-rival route and preserve every CSV/CZML artifact for later visual review:
+
+```bash
+./scripts/run-phase6-pd-sweep.sh --incremental
+```
+
+The runner writes a timestamped artifact directory under `ros2_ws/phase6-pd-sweep-*`, with one subdirectory per run plus `summary.md` and `summary.csv`.
+
 ## Phase 6 Acceptance
 
 The maintained phase-6 acceptance wrapper runs the current pursuit-guidance baseline in sequence:

@@ -686,9 +686,8 @@ ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source 
 MONITOR_PID=$!
 wait_for_topics "" 30
 
-echo "step 13: starting the live-rival rectangular route on plane_02"
-run_live_rival_rectangle_route >"${PLANE2_REPOSITION_LOG}" 2>&1 &
-RIVAL_ROUTE_PID=$!
+echo "step 13: letting the geometry monitor capture the initial baseline"
+sleep 3
 echo "step 14: sampling the initial cue error"
 INITIAL_CUE_ERROR="$(read_cue_error)"
 if [[ -z "${INITIAL_CUE_ERROR}" ]]; then
@@ -708,7 +707,11 @@ fi
 
 echo "initial cue error: ${INITIAL_CUE_ERROR} deg"
 
-echo "step 15: confirming the cueing bridge emits PX4 attitude offboard setpoints"
+echo "step 15: starting the live-rival rectangular route on plane_02"
+run_live_rival_rectangle_route >"${PLANE2_REPOSITION_LOG}" 2>&1 &
+RIVAL_ROUTE_PID=$!
+
+echo "step 16: confirming the cueing bridge emits PX4 attitude offboard setpoints"
 for ((i = 1; i <= 30; i++)); do
   if grep -q 'published trailing-slot cueing setpoint' "${CUEING_LOG}"; then
     break
@@ -721,14 +724,14 @@ if ! grep -q 'published trailing-slot cueing setpoint' "${CUEING_LOG}"; then
   exit 206
 fi
 
-echo "step 16: switching plane_01 into OFFBOARD for cueing"
+echo "step 17: switching plane_01 into OFFBOARD for cueing"
 run_vehicle_command "${PLANE1_NAMESPACE}" "${PLANE1_COMMAND_TOPIC}" "${PLANE1_ACK_TOPIC}" 'mode_offboard' "${PLANE1_SYS_ID}" "${PLANE1_MODE_LOG}"
 run_status_waiter "${PLANE1_NAMESPACE}" "${PLANE1_STATUS_TOPIC}" "${PLANE1_STATUS_LOG}" "${STATUS_TIMEOUT_SEC}" '' "${OFFBOARD_NAV_STATE}" ''
 
-echo "step 17: running the live-rival geometry capture window before CSV validation"
+echo "step 18: running the live-rival geometry capture window before CSV validation"
 sleep "${CUE_WINDOW_SEC}"
 
-echo "step 18: stopping live-rival geometry capture and landing both aircraft"
+echo "step 19: stopping live-rival geometry capture and landing both aircraft"
 stop_pid "${CUEING_PID}"
 CUEING_PID=""
 stop_pid "${MONITOR_PID}"
@@ -754,8 +757,8 @@ run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2
 run_status_waiter "${PLANE2_NAMESPACE}" "${PLANE2_STATUS_TOPIC}" "${PLANE2_STATUS_LOG}" "${STATUS_TIMEOUT_SEC}" '' "${LAND_NAV_STATE}" ''
 run_land_detected_waiter "${PLANE2_NAMESPACE}" "/${PLANE2_NAMESPACE}/fmu/out/vehicle_land_detected" "${PLANE2_LAND_DETECTED_LOG}" "${LAND_DETECTED_TIMEOUT_SEC}" 'true'
 
-echo "step 19: validating the recorded live-rival geometry artifact"
-GEOMETRY_SUMMARY="$("${ROOT_DIR}/scripts/evaluate-phase6-geometry.py" "${CSV_PATH}" --initial-bearing-min-deg "${INITIAL_BEARING_ERROR_MIN_DEG}" --bearing-improvement-min-deg "${BEARING_IMPROVEMENT_MIN_DEG}" --rival-route-min-distance-m "${RIVAL_MIN_ROUTE_DISTANCE_M}" --final-bearing-max-deg "${FINAL_BEARING_ERROR_MAX_DEG}" --final-cue-max-deg "${FINAL_CUE_ERROR_MAX_DEG}" --catch-min-altitude-m "${CATCH_MIN_ALTITUDE_M}" --hold-sec "${CUE_HOLD_SEC}" --initial-range-min-m "${INITIAL_RANGE_MIN_M}" --range-reduction-min-m "${RANGE_REDUCTION_MIN_M}" --final-range-max-m "${FINAL_RANGE_MAX_M}" --target-range-m "${TARGET_CHASE_RANGE_M}" --range-tolerance-m "${CHASE_RANGE_TOLERANCE_M}" --tail-angle-max-deg "${TAIL_ANGLE_MAX_DEG}" --heading-alignment-max-deg "${HEADING_ALIGNMENT_MAX_DEG}")"
+echo "step 20: validating the recorded live-rival geometry artifact"
+GEOMETRY_SUMMARY="$(${ROOT_DIR}/scripts/evaluate-phase6-geometry.py "${CSV_PATH}" --initial-bearing-min-deg "${INITIAL_BEARING_ERROR_MIN_DEG}" --bearing-improvement-min-deg "${BEARING_IMPROVEMENT_MIN_DEG}" --rival-route-min-distance-m "${RIVAL_MIN_ROUTE_DISTANCE_M}" --final-bearing-max-deg "${FINAL_BEARING_ERROR_MAX_DEG}" --final-cue-max-deg "${FINAL_CUE_ERROR_MAX_DEG}" --catch-min-altitude-m "${CATCH_MIN_ALTITUDE_M}" --hold-sec "${CUE_HOLD_SEC}" --initial-range-min-m "${INITIAL_RANGE_MIN_M}" --range-reduction-min-m "${RANGE_REDUCTION_MIN_M}" --final-range-max-m "${FINAL_RANGE_MAX_M}" --target-range-m "${TARGET_CHASE_RANGE_M}" --range-tolerance-m "${CHASE_RANGE_TOLERANCE_M}" --tail-angle-max-deg "${TAIL_ANGLE_MAX_DEG}" --heading-alignment-max-deg "${HEADING_ALIGNMENT_MAX_DEG}")"
 
 echo "phase-6 live-rival geometry and recovery succeeded"
 echo "initial cue error: ${INITIAL_CUE_ERROR} deg"
