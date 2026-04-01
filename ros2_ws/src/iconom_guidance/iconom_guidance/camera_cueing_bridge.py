@@ -84,9 +84,16 @@ class CameraCueingBridge(Node):
         self.declare_parameter("follow_tail_angle_exit_max_deg", 40.0)
         self.declare_parameter("follow_heading_alignment_entry_max_deg", 35.0)
         self.declare_parameter("follow_heading_alignment_exit_max_deg", 45.0)
-        self.declare_parameter("settle_range_entry_max_m", 40.0)
+        self.declare_parameter("follow_slot_range_entry_max_m", 12.0)
+        self.declare_parameter("follow_hold_sec", 0.5)
+        self.declare_parameter("settle_tail_angle_exit_max_deg", 55.0)
+        self.declare_parameter("settle_heading_alignment_exit_max_deg", 55.0)
+        self.declare_parameter("settle_range_entry_max_m", 30.0)
         self.declare_parameter("settle_hold_sec", 1.0)
         self.declare_parameter("settle_closing_speed_max_mps", 2.5)
+        self.declare_parameter("settle_min_thrust_x", 0.5)
+        self.declare_parameter("settle_closing_speed_decay_mps", 1.5)
+        self.declare_parameter("settle_break_hold_sec", 1.0)
         self.declare_parameter("roll_angle_gain", 0.8)
         self.declare_parameter("max_roll_deg", 35.0)
         self.declare_parameter("pitch_angle_deg", 2.0)
@@ -126,9 +133,16 @@ class CameraCueingBridge(Node):
         self.follow_tail_angle_exit_max_deg = float(self.get_parameter("follow_tail_angle_exit_max_deg").value)
         self.follow_heading_alignment_entry_max_deg = float(self.get_parameter("follow_heading_alignment_entry_max_deg").value)
         self.follow_heading_alignment_exit_max_deg = float(self.get_parameter("follow_heading_alignment_exit_max_deg").value)
+        self.follow_slot_range_entry_max_m = float(self.get_parameter("follow_slot_range_entry_max_m").value)
+        self.follow_hold_sec = float(self.get_parameter("follow_hold_sec").value)
+        self.settle_tail_angle_exit_max_deg = float(self.get_parameter("settle_tail_angle_exit_max_deg").value)
+        self.settle_heading_alignment_exit_max_deg = float(self.get_parameter("settle_heading_alignment_exit_max_deg").value)
         self.settle_range_entry_max_m = float(self.get_parameter("settle_range_entry_max_m").value)
         self.settle_hold_sec = float(self.get_parameter("settle_hold_sec").value)
         self.settle_closing_speed_max_mps = float(self.get_parameter("settle_closing_speed_max_mps").value)
+        self.settle_min_thrust_x = float(self.get_parameter("settle_min_thrust_x").value)
+        self.settle_closing_speed_decay_mps = float(self.get_parameter("settle_closing_speed_decay_mps").value)
+        self.settle_break_hold_sec = float(self.get_parameter("settle_break_hold_sec").value)
         self.roll_angle_gain = float(self.get_parameter("roll_angle_gain").value)
         self.max_roll_rad = math.radians(float(self.get_parameter("max_roll_deg").value))
         self.base_pitch_rad = math.radians(float(self.get_parameter("pitch_angle_deg").value))
@@ -154,6 +168,8 @@ class CameraCueingBridge(Node):
         self.longitudinal_follow_latched = False
         self.longitudinal_phase = "capture"
         self.longitudinal_settle_ready_since: Optional[float] = None
+        self.longitudinal_settle_broken_since: Optional[float] = None
+        self.longitudinal_follow_ready_since: Optional[float] = None
 
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -188,6 +204,8 @@ class CameraCueingBridge(Node):
         self.longitudinal_follow_latched = False
         self.longitudinal_phase = "capture"
         self.longitudinal_settle_ready_since = None
+        self.longitudinal_settle_broken_since = None
+        self.longitudinal_follow_ready_since = None
 
     def _handle_ownship_state(self, msg: PoseStamped) -> None:
         self.ownship_state = msg
@@ -282,7 +300,7 @@ class CameraCueingBridge(Node):
         if target_heading is None:
             return None
 
-        active_range = self._active_chase_range_m(self._current_target_range_3d_m(), in_follow=self.longitudinal_phase in ("follow", "recovery"))
+        active_range = self._active_chase_range_m(self._current_target_range_3d_m(), in_follow=self.longitudinal_phase == "follow")
         slot_x = target.x - math.cos(target_heading) * active_range
         slot_y = target.y - math.sin(target_heading) * active_range
         slot_z = target.z
@@ -452,10 +470,13 @@ class CameraCueingBridge(Node):
         closing_speed_mps, dt = self._estimate_closing_speed_mps(aft_distance_m)
         desired_capture_aft_m = self._active_chase_range_m(range_to_target_m, in_follow=False)
         desired_follow_aft_m = self._active_chase_range_m(range_to_target_m, in_follow=True)
+        range_to_slot_m = self._current_slot_range_3d_m()
 
         if self.longitudinal_phase == "capture":
             if self._longitudinal_follow_ready(aft_distance_m, desired_capture_aft_m, range_to_target_m):
                 self.longitudinal_phase = "settle"
+                self.longitudinal_settle_broken_since = None
+                self.longitudinal_follow_ready_since = None
             else:
                 self.longitudinal_follow_latched = False
                 self.integrated_speed_error *= 0.5
@@ -468,15 +489,15 @@ class CameraCueingBridge(Node):
                     "capture",
                 )
 
-        desired_aft_m = desired_capture_aft_m if self.longitudinal_phase == "settle" else desired_follow_aft_m
+        desired_aft_m = desired_capture_aft_m if self.longitudinal_phase in ("settle", "recovery") else desired_follow_aft_m
         aft_error_m = aft_distance_m - desired_aft_m
         overshoot_risk = self._overshoot_risk(aft_distance_m, desired_aft_m, closing_speed_mps)
         tail_angle_deg, heading_alignment_error_deg = self._current_chase_geometry()
         settle_geometry_broken = (
             tail_angle_deg is None
             or heading_alignment_error_deg is None
-            or tail_angle_deg > self.follow_tail_angle_exit_max_deg
-            or heading_alignment_error_deg > self.follow_heading_alignment_exit_max_deg
+            or tail_angle_deg > self.settle_tail_angle_exit_max_deg
+            or heading_alignment_error_deg > self.settle_heading_alignment_exit_max_deg
         )
         follow_geometry_broken = (
             tail_angle_deg is None
@@ -488,21 +509,47 @@ class CameraCueingBridge(Node):
         if self.longitudinal_phase == "settle":
             self.longitudinal_follow_latched = True
             if settle_geometry_broken:
-                self.longitudinal_phase = "capture"
-                self.longitudinal_follow_latched = False
-                self.integrated_speed_error *= 0.5
-                desired_closing_speed_mps = self.capture_closing_speed_max_mps
-                return (
-                    self.max_thrust_x,
-                    aft_distance_m,
-                    closing_speed_mps,
-                    desired_closing_speed_mps,
-                    "capture",
-                )
+                now = self._now()
+                if self.longitudinal_settle_broken_since is None:
+                    self.longitudinal_settle_broken_since = now
+                elif (now - self.longitudinal_settle_broken_since) >= self.settle_break_hold_sec:
+                    self.longitudinal_phase = "capture"
+                    self.longitudinal_follow_latched = False
+                    self.longitudinal_settle_broken_since = None
+                    self.longitudinal_follow_ready_since = None
+                    self.integrated_speed_error *= 0.5
+                    desired_closing_speed_mps = self.capture_closing_speed_max_mps
+                    return (
+                        self.max_thrust_x,
+                        aft_distance_m,
+                        closing_speed_mps,
+                        desired_closing_speed_mps,
+                        "capture",
+                    )
+            else:
+                self.longitudinal_settle_broken_since = None
             if overshoot_risk:
+                self.longitudinal_follow_ready_since = None
                 self.longitudinal_phase = "recovery"
-            elif aft_distance_m <= (desired_capture_aft_m + 2.0 * self.hold_aft_error_band_m) and closing_speed_mps <= self.approach_closing_speed_max_mps:
-                self.longitudinal_phase = "follow"
+            else:
+                follow_entry_ready = (
+                    tail_angle_deg is not None
+                    and heading_alignment_error_deg is not None
+                    and tail_angle_deg <= self.follow_tail_angle_entry_max_deg
+                    and heading_alignment_error_deg <= self.follow_heading_alignment_entry_max_deg
+                    and aft_distance_m >= desired_capture_aft_m
+                    and range_to_slot_m is not None
+                    and range_to_slot_m <= self.follow_slot_range_entry_max_m
+                )
+                if follow_entry_ready:
+                    now = self._now()
+                    if self.longitudinal_follow_ready_since is None:
+                        self.longitudinal_follow_ready_since = now
+                    elif (now - self.longitudinal_follow_ready_since) >= self.follow_hold_sec:
+                        self.longitudinal_phase = "follow"
+                        self.longitudinal_follow_ready_since = None
+                else:
+                    self.longitudinal_follow_ready_since = None
 
         if self.longitudinal_phase == "recovery":
             self.longitudinal_follow_latched = True
@@ -519,39 +566,58 @@ class CameraCueingBridge(Node):
                 )
 
         if self.longitudinal_phase == "settle":
-            desired_closing_speed_mps = clamp(
-                self.longitudinal_outer_gain * aft_error_m,
-                0.0,
+            settle_target_from_aft_error_mps = max(0.0, self.longitudinal_outer_gain * aft_error_m)
+            settle_target_from_current_closure_mps = max(
                 self.settle_closing_speed_max_mps,
+                closing_speed_mps - self.settle_closing_speed_decay_mps,
+            )
+            desired_closing_speed_mps = max(
+                settle_target_from_aft_error_mps,
+                settle_target_from_current_closure_mps,
             )
             mode = "settle"
         else:
             self.longitudinal_phase = "follow"
             self.longitudinal_follow_latched = True
             if follow_geometry_broken:
-                self.longitudinal_phase = "capture"
-                self.longitudinal_follow_latched = False
-                self.integrated_speed_error *= 0.5
-                desired_closing_speed_mps = self.capture_closing_speed_max_mps
-                return (
-                    self.max_thrust_x,
-                    aft_distance_m,
-                    closing_speed_mps,
-                    desired_closing_speed_mps,
-                    "capture",
-                )
-            mode = self._longitudinal_mode(aft_distance_m, desired_aft_m)
-            desired_closing_speed_mps = self._desired_closing_speed_mps(aft_error_m, mode)
-            if mode == "recovery" or overshoot_risk:
-                self.longitudinal_phase = "recovery"
-                self.integrated_speed_error *= 0.5
-                return (
-                    self.min_thrust_x,
-                    aft_distance_m,
-                    closing_speed_mps,
-                    desired_closing_speed_mps,
-                    "recovery",
-                )
+                if not settle_geometry_broken:
+                    self.longitudinal_phase = "settle"
+                    self.longitudinal_follow_ready_since = None
+                    settle_target_from_aft_error_mps = max(0.0, self.longitudinal_outer_gain * aft_error_m)
+                    settle_target_from_current_closure_mps = max(
+                        self.settle_closing_speed_max_mps,
+                        closing_speed_mps - self.settle_closing_speed_decay_mps,
+                    )
+                    desired_closing_speed_mps = max(
+                        settle_target_from_aft_error_mps,
+                        settle_target_from_current_closure_mps,
+                    )
+                    mode = "settle"
+                else:
+                    self.longitudinal_phase = "capture"
+                    self.longitudinal_follow_latched = False
+                    self.integrated_speed_error *= 0.5
+                    desired_closing_speed_mps = self.capture_closing_speed_max_mps
+                    return (
+                        self.max_thrust_x,
+                        aft_distance_m,
+                        closing_speed_mps,
+                        desired_closing_speed_mps,
+                        "capture",
+                    )
+            else:
+                mode = self._longitudinal_mode(aft_distance_m, desired_aft_m)
+                desired_closing_speed_mps = self._desired_closing_speed_mps(aft_error_m, mode)
+                if mode == "recovery" or overshoot_risk:
+                    self.longitudinal_phase = "recovery"
+                    self.integrated_speed_error *= 0.5
+                    return (
+                        self.min_thrust_x,
+                        aft_distance_m,
+                        closing_speed_mps,
+                        desired_closing_speed_mps,
+                        "recovery",
+                    )
 
         speed_error = desired_closing_speed_mps - closing_speed_mps
         if dt > 0.0:
@@ -563,9 +629,12 @@ class CameraCueingBridge(Node):
 
         proportional_term = self.closing_speed_kp * speed_error
         integral_term = self.closing_speed_ki * self.integrated_speed_error
-        commanded = self.min_thrust_x + proportional_term + integral_term
+        base_thrust_x = self.min_thrust_x
+        if self.longitudinal_phase == "settle":
+            base_thrust_x = clamp(self.settle_min_thrust_x, self.min_thrust_x, self.max_thrust_x)
+        commanded = base_thrust_x + proportional_term + integral_term
         return (
-            clamp(commanded, self.min_thrust_x, self.max_thrust_x),
+            clamp(commanded, base_thrust_x, self.max_thrust_x),
             aft_distance_m,
             closing_speed_mps,
             desired_closing_speed_mps,
