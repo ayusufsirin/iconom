@@ -29,7 +29,8 @@ TRANSITION_COLOR = [255, 255, 255, 255]
 PHASE_COLOR_MAP = {
     "capture": [37, 99, 235, 255],
     "settle": [245, 158, 11, 255],
-    "follow": [34, 197, 94, 255],
+    "follow_lock": [16, 185, 129, 255],
+    "follow_hold": [34, 197, 94, 255],
     "recovery": [239, 68, 68, 255],
 }
 
