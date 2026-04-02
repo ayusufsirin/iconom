@@ -224,7 +224,7 @@ ${extra_env}
   " >"${output_file}" 2>&1
 }
 
-run_live_rival_rectangle_route() {
+run_live_rival_straight_route() {
   run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" 'do_reposition' "${PLANE2_SYS_ID}" "${PLANE2_ROUTE_POINT1_LOG}" "    export PX4_TARGET_OFFSET_NORTH_M='${PLANE2_ROUTE_POINT1_NORTH_M}'
     export PX4_TARGET_OFFSET_EAST_M='${PLANE2_ROUTE_POINT1_EAST_M}'
     export PX4_TARGET_OFFSET_ALT_M='${PLANE2_ROUTE_POINT_ALT_M}'
@@ -505,18 +505,18 @@ RANGE_REDUCTION_MIN_M="${PHASE6_RANGE_REDUCTION_MIN_M:-40.0}"
 FINAL_RANGE_MAX_M="${PHASE6_FINAL_RANGE_MAX_M:-60.0}"
 TAIL_ANGLE_MAX_DEG="${PHASE6_TAIL_ANGLE_MAX_DEG:-45.0}"
 HEADING_ALIGNMENT_MAX_DEG="${PHASE6_HEADING_ALIGNMENT_MAX_DEG:-35.0}"
-PLANE2_ROUTE_POINT1_NORTH_M="${PHASE6_LIVE_RIVAL_RECT_POINT1_NORTH_M:-120.0}"
-PLANE2_ROUTE_POINT1_EAST_M="${PHASE6_LIVE_RIVAL_RECT_POINT1_EAST_M:-0.0}"
-PLANE2_ROUTE_POINT2_NORTH_M="${PHASE6_LIVE_RIVAL_RECT_POINT2_NORTH_M:-120.0}"
-PLANE2_ROUTE_POINT2_EAST_M="${PHASE6_LIVE_RIVAL_RECT_POINT2_EAST_M:-0.0}"
-PLANE2_ROUTE_POINT3_NORTH_M="${PHASE6_LIVE_RIVAL_RECT_POINT3_NORTH_M:-120.0}"
-PLANE2_ROUTE_POINT3_EAST_M="${PHASE6_LIVE_RIVAL_RECT_POINT3_EAST_M:-0.0}"
-PLANE2_ROUTE_POINT4_NORTH_M="${PHASE6_LIVE_RIVAL_RECT_POINT4_NORTH_M:-120.0}"
-PLANE2_ROUTE_POINT4_EAST_M="${PHASE6_LIVE_RIVAL_RECT_POINT4_EAST_M:-0.0}"
-PLANE2_ROUTE_POINT_ALT_M="${PHASE6_LIVE_RIVAL_RECT_POINT_ALT_M:-0.0}"
-PLANE2_ROUTE_LEG_DWELL_SEC="${PHASE6_LIVE_RIVAL_RECT_LEG_DWELL_SEC:-6}"
-PLANE2_ROUTE_LOITER_RADIUS_M="${PHASE6_LIVE_RIVAL_RECT_LOITER_RADIUS_M:-30.0}"
-PLANE2_ROUTE_GROUNDSPEED_M_S="${PHASE6_LIVE_RIVAL_RECT_GROUNDSPEED_M_S:-12.0}"
+PLANE2_ROUTE_POINT1_NORTH_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT1_NORTH_M:-120.0}"
+PLANE2_ROUTE_POINT1_EAST_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT1_EAST_M:-0.0}"
+PLANE2_ROUTE_POINT2_NORTH_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT2_NORTH_M:-240.0}"
+PLANE2_ROUTE_POINT2_EAST_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT2_EAST_M:-0.0}"
+PLANE2_ROUTE_POINT3_NORTH_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT3_NORTH_M:-360.0}"
+PLANE2_ROUTE_POINT3_EAST_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT3_EAST_M:-0.0}"
+PLANE2_ROUTE_POINT4_NORTH_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT4_NORTH_M:-480.0}"
+PLANE2_ROUTE_POINT4_EAST_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT4_EAST_M:-0.0}"
+PLANE2_ROUTE_POINT_ALT_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT_ALT_M:-0.0}"
+PLANE2_ROUTE_LEG_DWELL_SEC="${PHASE6_LIVE_RIVAL_STRAIGHT_LEG_DWELL_SEC:-8}"
+PLANE2_ROUTE_LOITER_RADIUS_M="${PHASE6_LIVE_RIVAL_STRAIGHT_LOITER_RADIUS_M:-20.0}"
+PLANE2_ROUTE_GROUNDSPEED_M_S="${PHASE6_LIVE_RIVAL_STRAIGHT_GROUNDSPEED_M_S:-12.0}"
 CUE_THRUST_X="${PHASE6_CUE_THRUST_X:-0.66}"
 CUE_MIN_THRUST_X="${PHASE6_CUE_MIN_THRUST_X:-0.36}"
 CUE_RANGE_THRUST_GAIN="${PHASE6_CUE_RANGE_THRUST_GAIN:-0.02}"
@@ -556,7 +556,7 @@ echo "  - plane_01 and plane_02 start in the shared phase-4 runtime"
 echo "  - both aircraft take off and stabilize"
 echo "  - plane_02 publishes live rival state into /competition/rival/state"
 echo "  - plane_01 runs the maintained phase-6 cueing path against the real plane_02 target"
-echo "  - plane_02 flies a long straight live-rival route to support sustained stern-chase hold"
+echo "  - plane_02 flies a longer straight live-rival route to isolate stern-chase locking"
 echo "  - recorded ownship-versus-rival geometry shows a sustained airborne stern-chase hold in the forward cone while keeping an env-driven trailing range and heading alignment"
 echo "  - after cueing, both aircraft must complete a successful landing"
 echo
@@ -707,8 +707,8 @@ fi
 
 echo "initial cue error: ${INITIAL_CUE_ERROR} deg"
 
-echo "step 15: starting the live-rival rectangular route on plane_02"
-run_live_rival_rectangle_route >"${PLANE2_REPOSITION_LOG}" 2>&1 &
+echo "step 15: starting the live-rival straight route on plane_02"
+run_live_rival_straight_route >"${PLANE2_REPOSITION_LOG}" 2>&1 &
 RIVAL_ROUTE_PID=$!
 
 echo "step 16: confirming the cueing bridge emits PX4 attitude offboard setpoints"

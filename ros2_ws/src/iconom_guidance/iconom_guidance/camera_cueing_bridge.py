@@ -102,6 +102,7 @@ class CameraCueingBridge(Node):
         self.declare_parameter("max_pitch_deg", 12.0)
         self.declare_parameter("altitude_error_deadband_m", 2.0)
         self.declare_parameter("selected_timeout_sec", 6.0)
+        self.declare_parameter("target_propagation_max_sec", 1.0)
         self.declare_parameter("capture_error_deg", 20.0)
         self.declare_parameter("near_roll_scale", 0.35)
 
@@ -152,6 +153,7 @@ class CameraCueingBridge(Node):
         self.max_pitch_rad = math.radians(float(self.get_parameter("max_pitch_deg").value))
         self.altitude_error_deadband_m = float(self.get_parameter("altitude_error_deadband_m").value)
         self.selected_timeout_sec = float(self.get_parameter("selected_timeout_sec").value)
+        self.target_propagation_max_sec = float(self.get_parameter("target_propagation_max_sec").value)
         self.capture_error_deg = float(self.get_parameter("capture_error_deg").value)
         self.near_roll_scale = float(self.get_parameter("near_roll_scale").value)
 
@@ -161,6 +163,11 @@ class CameraCueingBridge(Node):
         self.ownship_state: Optional[PoseStamped] = None
         self.selected_target: Optional[PoseStamped] = None
         self.selected_target_at: Optional[float] = None
+        self.selected_target_heading_rad = 0.0
+        self.target_velocity_x_mps = 0.0
+        self.target_velocity_y_mps = 0.0
+        self.target_velocity_z_mps = 0.0
+        self.target_yaw_rate_radps = 0.0
         self.pursuit_state = "idle"
         self.last_log_at = 0.0
         self.previous_aft_distance_m: Optional[float] = None
@@ -215,12 +222,35 @@ class CameraCueingBridge(Node):
         self.longitudinal_follow_lock_started_at = None
         self.longitudinal_follow_ready_since = None
 
+    def _prime_longitudinal_observer(self, aft_distance_m: float) -> None:
+        self.previous_aft_distance_m = aft_distance_m
+        self.previous_longitudinal_sample_at = self._now()
+        self.filtered_closing_speed_mps = 0.0
+        self.integrated_speed_error = 0.0
+
     def _handle_ownship_state(self, msg: PoseStamped) -> None:
         self.ownship_state = msg
 
     def _handle_selected_target(self, msg: PoseStamped) -> None:
+        now = self._now()
+        heading_rad = yaw_from_quaternion(msg.pose.orientation.z, msg.pose.orientation.w)
+        if self.selected_target is not None and self.selected_target_at is not None:
+            dt = now - self.selected_target_at
+            if dt > 1e-3:
+                previous_position = self.selected_target.pose.position
+                current_position = msg.pose.position
+                self.target_velocity_x_mps = float(current_position.x - previous_position.x) / dt
+                self.target_velocity_y_mps = float(current_position.y - previous_position.y) / dt
+                self.target_velocity_z_mps = float(current_position.z - previous_position.z) / dt
+                self.target_yaw_rate_radps = wrap_angle(heading_rad - self.selected_target_heading_rad) / dt
+        else:
+            self.target_velocity_x_mps = 0.0
+            self.target_velocity_y_mps = 0.0
+            self.target_velocity_z_mps = 0.0
+            self.target_yaw_rate_radps = 0.0
         self.selected_target = msg
-        self.selected_target_at = self._now()
+        self.selected_target_at = now
+        self.selected_target_heading_rad = heading_rad
 
     def _handle_pursuit_state(self, msg: String) -> None:
         self.pursuit_state = msg.data.strip().lower()
@@ -235,28 +265,40 @@ class CameraCueingBridge(Node):
         )
 
     def _target_heading_rad(self) -> Optional[float]:
-        if not self._target_fresh() or self.selected_target is None:
+        target_state = self._propagated_target_state()
+        if target_state is None:
             return None
-        return yaw_from_quaternion(
-            self.selected_target.pose.orientation.z,
-            self.selected_target.pose.orientation.w,
+        return target_state[3]
+
+    def _propagated_target_state(self) -> Optional[tuple[float, float, float, float]]:
+        if not self._target_fresh() or self.selected_target is None or self.selected_target_at is None:
+            return None
+
+        propagation_dt = clamp(self._now() - self.selected_target_at, 0.0, self.target_propagation_max_sec)
+        target = self.selected_target.pose.position
+        propagated_heading_rad = wrap_angle(self.selected_target_heading_rad + self.target_yaw_rate_radps * propagation_dt)
+        return (
+            float(target.x) + self.target_velocity_x_mps * propagation_dt,
+            float(target.y) + self.target_velocity_y_mps * propagation_dt,
+            float(target.z) + self.target_velocity_z_mps * propagation_dt,
+            propagated_heading_rad,
         )
 
     def _current_chase_geometry(self) -> tuple[Optional[float], Optional[float]]:
-        if self.ownship_state is None or not self._target_fresh() or self.selected_target is None:
+        if self.ownship_state is None:
             return None, None
 
-        target_heading = self._target_heading_rad()
-        if target_heading is None:
+        target_state = self._propagated_target_state()
+        if target_state is None:
             return None, None
 
+        target_x, target_y, _, target_heading = target_state
         own = self.ownship_state.pose.position
-        target = self.selected_target.pose.position
         own_heading = yaw_from_quaternion(
             self.ownship_state.pose.orientation.z,
             self.ownship_state.pose.orientation.w,
         )
-        rival_to_own_heading = math.atan2(float(own.y - target.y), float(own.x - target.x))
+        rival_to_own_heading = math.atan2(float(own.y) - target_y, float(own.x) - target_x)
         rival_rear_heading = wrap_angle(target_heading + math.pi)
 
         tail_angle_deg = angle_error_deg(math.degrees(rival_to_own_heading), math.degrees(rival_rear_heading))
@@ -304,8 +346,9 @@ class CameraCueingBridge(Node):
         if self.longitudinal_phase != "follow_lock":
             return expanded_follow_range_m
         squeeze_enable_range_m = self.follow_slot_range_entry_max_m + self.chase_range_tolerance_m
-        if range_to_target_m is None or range_to_target_m > squeeze_enable_range_m:
-            self.longitudinal_follow_lock_started_at = None
+        if self.longitudinal_follow_lock_started_at is None and (
+            range_to_target_m is None or range_to_target_m > squeeze_enable_range_m
+        ):
             return expanded_follow_range_m
         if self.longitudinal_follow_lock_started_at is None:
             self.longitudinal_follow_lock_started_at = self._now()
@@ -314,30 +357,30 @@ class CameraCueingBridge(Node):
         return expanded_follow_range_m + squeeze_progress * (self.target_chase_range_m - expanded_follow_range_m)
 
     def _trailing_slot_position(self) -> Optional[tuple[float, float, float]]:
-        if not self._target_fresh() or self.selected_target is None:
-            return None
-        target = self.selected_target.pose.position
-        target_heading = self._target_heading_rad()
-        if target_heading is None:
+        target_state = self._propagated_target_state()
+        if target_state is None:
             return None
 
+        target_x, target_y, target_z, target_heading = target_state
         active_range = self._active_chase_range_m(
             self._current_target_range_3d_m(),
             in_follow=self.longitudinal_phase in ("follow_lock", "follow_hold", "recovery"),
         )
-        slot_x = target.x - math.cos(target_heading) * active_range
-        slot_y = target.y - math.sin(target_heading) * active_range
-        slot_z = target.z
+        slot_x = target_x - math.cos(target_heading) * active_range
+        slot_y = target_y - math.sin(target_heading) * active_range
+        slot_z = target_z
         return float(slot_x), float(slot_y), float(slot_z)
 
     def _current_target_range_3d_m(self) -> Optional[float]:
-        if self.ownship_state is None or not self._target_fresh() or self.selected_target is None:
+        if self.ownship_state is None:
+            return None
+        target_state = self._propagated_target_state()
+        if target_state is None:
             return None
         own = self.ownship_state.pose.position
-        target = self.selected_target.pose.position
-        dx = float(target.x - own.x)
-        dy = float(target.y - own.y)
-        dz = float(target.z - own.z)
+        dx = float(target_state[0] - own.x)
+        dy = float(target_state[1] - own.y)
+        dz = float(target_state[2] - own.z)
         return math.sqrt(dx * dx + dy * dy + dz * dz)
 
     def _current_slot_range_3d_m(self) -> Optional[float]:
@@ -353,17 +396,17 @@ class CameraCueingBridge(Node):
         return math.sqrt(dx * dx + dy * dy + dz * dz)
 
     def _current_aft_distance_m(self) -> Optional[float]:
-        if self.ownship_state is None or not self._target_fresh() or self.selected_target is None:
+        if self.ownship_state is None:
             return None
 
-        target_heading = self._target_heading_rad()
-        if target_heading is None:
+        target_state = self._propagated_target_state()
+        if target_state is None:
             return None
 
+        target_x, target_y, _, target_heading = target_state
         own = self.ownship_state.pose.position
-        target = self.selected_target.pose.position
-        dx = float(own.x - target.x)
-        dy = float(own.y - target.y)
+        dx = float(own.x) - target_x
+        dy = float(own.y) - target_y
         tx = math.cos(target_heading)
         ty = math.sin(target_heading)
         return -(dx * tx + dy * ty)
@@ -572,6 +615,9 @@ class CameraCueingBridge(Node):
                     self.longitudinal_follow_hold_ready_since = None
                     self.longitudinal_follow_ready_since = None
                     self.longitudinal_follow_lock_started_at = None
+                    self._prime_longitudinal_observer(aft_distance_m)
+                    closing_speed_mps = 0.0
+                    dt = 0.0
             else:
                 self.longitudinal_follow_ready_since = None
                 if overshoot_risk:
@@ -659,15 +705,26 @@ class CameraCueingBridge(Node):
                 else:
                     self.longitudinal_follow_hold_ready_since = None
 
+                near_final_follow_lock = (
+                    desired_aft_m <= (self.target_chase_range_m + 0.5)
+                    and range_to_target_m is not None
+                    and range_to_target_m <= self.follow_slot_range_entry_max_m
+                )
                 follow_target = clamp(
                     self.longitudinal_outer_gain * aft_error_m,
                     0.0,
                     self.approach_closing_speed_max_mps,
                 )
-                lock_floor = max(
-                    self.approach_closing_speed_max_mps,
-                    closing_speed_mps - (0.5 * self.settle_closing_speed_decay_mps),
-                )
+                if near_final_follow_lock:
+                    lock_floor = max(
+                        self.hold_closing_speed_max_mps,
+                        closing_speed_mps - self.settle_closing_speed_decay_mps,
+                    )
+                else:
+                    lock_floor = max(
+                        self.approach_closing_speed_max_mps,
+                        closing_speed_mps - (0.5 * self.settle_closing_speed_decay_mps),
+                    )
                 desired_closing_speed_mps = max(follow_target, lock_floor)
                 mode = "follow_lock"
             else:
@@ -747,8 +804,18 @@ class CameraCueingBridge(Node):
         proportional_term = self.closing_speed_kp * speed_error
         integral_term = self.closing_speed_ki * self.integrated_speed_error
         base_thrust_x = self.min_thrust_x
-        if self.longitudinal_phase in ("settle", "follow_lock"):
+        if self.longitudinal_phase == "settle":
             base_thrust_x = clamp(self.settle_min_thrust_x, self.min_thrust_x, self.max_thrust_x)
+        elif self.longitudinal_phase == "follow_lock":
+            near_final_follow_lock = (
+                desired_aft_m <= (self.target_chase_range_m + 0.5)
+                and range_to_target_m is not None
+                and range_to_target_m <= self.follow_slot_range_entry_max_m
+            )
+            if near_final_follow_lock:
+                base_thrust_x = self.min_thrust_x
+            else:
+                base_thrust_x = clamp(self.settle_min_thrust_x, self.min_thrust_x, self.max_thrust_x)
         commanded = base_thrust_x + proportional_term + integral_term
         return (
             clamp(commanded, base_thrust_x, self.max_thrust_x),
