@@ -314,12 +314,16 @@ class CameraCueingBridge(Node):
             and heading_alignment_error_deg <= self.capture_heading_alignment_max_deg
         )
 
-    def _longitudinal_follow_ready(self, aft_distance_m: float, desired_aft_m: float, range_to_target_m: Optional[float]) -> bool:
+    def _longitudinal_follow_ready(self, aft_distance_m: float, desired_aft_m: float, range_to_slot_m: Optional[float]) -> bool:
         tail_angle_deg, heading_alignment_error_deg = self._current_chase_geometry()
+        aft_ready_threshold_m = max(
+            self.recovery_aft_distance_min_m,
+            desired_aft_m - self.approach_aft_error_band_m,
+        )
         rear_aspect_good = (
-            range_to_target_m is not None
-            and range_to_target_m <= self.settle_range_entry_max_m
-            and aft_distance_m >= self.recovery_aft_distance_min_m
+            range_to_slot_m is not None
+            and range_to_slot_m <= self.settle_range_entry_max_m
+            and aft_distance_m >= aft_ready_threshold_m
             and tail_angle_deg is not None
             and heading_alignment_error_deg is not None
             and tail_angle_deg <= self.follow_tail_angle_entry_max_deg
@@ -542,7 +546,7 @@ class CameraCueingBridge(Node):
             self.longitudinal_follow_lock_started_at = None
 
         if self.longitudinal_phase == "capture":
-            if self._longitudinal_follow_ready(aft_distance_m, desired_capture_aft_m, range_to_target_m):
+            if self._longitudinal_follow_ready(aft_distance_m, desired_capture_aft_m, range_to_slot_m):
                 self.longitudinal_phase = "settle"
                 self.longitudinal_settle_broken_since = None
                 self.longitudinal_follow_ready_since = None
