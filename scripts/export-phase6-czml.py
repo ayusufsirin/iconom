@@ -25,6 +25,7 @@ RIVAL_COLOR = [198, 40, 40, 255]
 SELECTED_COLOR = [255, 179, 0, 255]
 INTERCEPT_COLOR = [46, 204, 113, 255]
 SLOT_COLOR = [244, 114, 182, 255]
+PROPAGATED_COLOR = [0, 188, 212, 255]
 TRANSITION_COLOR = [255, 255, 255, 255]
 PHASE_COLOR_MAP = {
     "capture": [37, 99, 235, 255],
@@ -76,8 +77,16 @@ def wrap_angle(angle_rad: float) -> float:
     return math.atan2(math.sin(angle_rad), math.cos(angle_rad))
 
 
+def clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
 def angle_error_deg(a_deg: float, b_deg: float) -> float:
     return abs(math.degrees(wrap_angle(math.radians(a_deg - b_deg))))
+
+
+def wrap_angle_deg(angle_deg: float) -> float:
+    return math.degrees(wrap_angle(math.radians(angle_deg)))
 
 
 def load_rows(csv_path: Path) -> list[dict[str, float]]:
@@ -335,6 +344,77 @@ def make_transition_packets(
     return packets
 
 
+def augment_with_propagated_target(rows: list[dict[str, float]]) -> None:
+    for row in rows:
+        row["propagated_x"] = float("nan")
+        row["propagated_y"] = float("nan")
+        row["propagated_z"] = float("nan")
+        row["propagated_yaw_deg"] = float("nan")
+
+    samples: list[dict[str, float]] = []
+    previous_selected_age_sec = float("nan")
+    previous_selected_x = float("nan")
+    previous_selected_y = float("nan")
+    previous_selected_z = float("nan")
+    previous_selected_yaw_deg = float("nan")
+
+    for row in rows:
+        if any(math.isnan(row[key]) for key in ("selected_x", "selected_y", "selected_z", "selected_yaw_deg")):
+            continue
+        selected_age_sec = 0.0 if math.isnan(row["selected_age_sec"]) else max(row["selected_age_sec"], 0.0)
+        sample_time_sec = row["t_sec"] - selected_age_sec
+        is_new_sample = (
+            not samples
+            or math.isnan(previous_selected_age_sec)
+            or selected_age_sec + 1e-6 < previous_selected_age_sec
+            or abs(row["selected_x"] - previous_selected_x) > 1e-6
+            or abs(row["selected_y"] - previous_selected_y) > 1e-6
+            or abs(row["selected_z"] - previous_selected_z) > 1e-6
+            or angle_error_deg(row["selected_yaw_deg"], previous_selected_yaw_deg) > 1e-3
+        )
+        if is_new_sample:
+            sample = {
+                "sample_t_sec": sample_time_sec,
+                "x": row["selected_x"],
+                "y": row["selected_y"],
+                "z": row["selected_z"],
+                "yaw_deg": row["selected_yaw_deg"],
+                "vx_mps": 0.0,
+                "vy_mps": 0.0,
+                "vz_mps": 0.0,
+                "yaw_rate_degps": 0.0,
+            }
+            if samples:
+                previous_sample = samples[-1]
+                dt = max(sample_time_sec - previous_sample["sample_t_sec"], 1e-3)
+                sample["vx_mps"] = (sample["x"] - previous_sample["x"]) / dt
+                sample["vy_mps"] = (sample["y"] - previous_sample["y"]) / dt
+                sample["vz_mps"] = (sample["z"] - previous_sample["z"]) / dt
+                sample["yaw_rate_degps"] = wrap_angle_deg(sample["yaw_deg"] - previous_sample["yaw_deg"]) / dt
+            samples.append(sample)
+        previous_selected_age_sec = selected_age_sec
+        previous_selected_x = row["selected_x"]
+        previous_selected_y = row["selected_y"]
+        previous_selected_z = row["selected_z"]
+        previous_selected_yaw_deg = row["selected_yaw_deg"]
+
+    if not samples:
+        return
+
+    sample_index = 0
+    for row in rows:
+        if any(math.isnan(row[key]) for key in ("selected_x", "selected_y", "selected_z", "selected_yaw_deg")):
+            continue
+        while sample_index + 1 < len(samples) and samples[sample_index + 1]["sample_t_sec"] <= row["t_sec"] + 1e-6:
+            sample_index += 1
+        sample = samples[sample_index]
+        propagation_dt = 0.0 if math.isnan(row["selected_age_sec"]) else clamp(row["selected_age_sec"], 0.0, max(0.0, row["t_sec"] - sample["sample_t_sec"]))
+        row["propagated_x"] = sample["x"] + sample["vx_mps"] * propagation_dt
+        row["propagated_y"] = sample["y"] + sample["vy_mps"] * propagation_dt
+        row["propagated_z"] = sample["z"] + sample["vz_mps"] * propagation_dt
+        row["propagated_yaw_deg"] = sample["yaw_deg"] + sample["yaw_rate_degps"] * propagation_dt
+
+
 def augment_with_virtual_slot(rows: list[dict[str, float]], args: argparse.Namespace) -> None:
     for row in rows:
         row["slot_x"] = float("nan")
@@ -413,6 +493,7 @@ def build_czml(
         make_entity_packet("ownship", "plane_01 ownship", OWN_COLOR, rows, "own_x", "own_y", "own_z", anchor_lat_deg, anchor_lon_deg, anchor_alt_m, epoch, availability),
         make_entity_packet("rival", "plane_02 rival", RIVAL_COLOR, rows, "rival_x", "rival_y", "rival_z", anchor_lat_deg, anchor_lon_deg, anchor_alt_m, epoch, availability),
         make_entity_packet("selected_target", "selected target", SELECTED_COLOR, rows, "selected_x", "selected_y", "selected_z", anchor_lat_deg, anchor_lon_deg, anchor_alt_m, epoch, availability),
+        make_entity_packet("propagated_target", "interpolated rival", PROPAGATED_COLOR, rows, "propagated_x", "propagated_y", "propagated_z", anchor_lat_deg, anchor_lon_deg, anchor_alt_m, epoch, availability),
         make_entity_packet("intercept_target", "intercept target", INTERCEPT_COLOR, rows, "intercept_x", "intercept_y", "intercept_z", anchor_lat_deg, anchor_lon_deg, anchor_alt_m, epoch, availability),
         make_entity_packet("trailing_slot", "virtual trailing slot", SLOT_COLOR, rows, "slot_x", "slot_y", "slot_z", anchor_lat_deg, anchor_lon_deg, anchor_alt_m, epoch, availability),
     ):
@@ -430,6 +511,7 @@ def main() -> int:
         raise SystemExit(f"missing CSV: {csv_path}")
     output_path = Path(args.output).resolve() if args.output else csv_path.with_suffix(csv_path.suffix + ".czml")
     rows = load_rows(csv_path)
+    augment_with_propagated_target(rows)
     augment_with_virtual_slot(rows, args)
     czml = build_czml(rows, args.anchor_lat_deg, args.anchor_lon_deg, args.anchor_alt_m, args.epoch)
     output_path.write_text(json.dumps(czml, indent=2), encoding="utf-8")
