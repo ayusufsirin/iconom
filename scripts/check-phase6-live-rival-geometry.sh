@@ -55,6 +55,7 @@ CUEING_PID=""
 MONITOR_PID=""
 RIVAL_ROUTE_PID=""
 COLD_BUILD="${ICONOM_PHASE6_COLD_BUILD:-0}"
+service=""
 
 usage() {
   cat <<'USAGE'
@@ -64,6 +65,7 @@ Run the standalone phase-6 live-rival geometry hardening check.
 
 Environment:
   ICONOM_PHASE6_COLD_BUILD=0|1
+  PHASE6_LIVE_RIVAL_ROUTE_POINTS="north,east;north,east;..."
 USAGE
 }
 
@@ -224,33 +226,81 @@ ${extra_env}
   " >"${output_file}" 2>&1
 }
 
-run_live_rival_straight_route() {
-  run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" 'do_reposition' "${PLANE2_SYS_ID}" "${PLANE2_ROUTE_POINT1_LOG}" "    export PX4_TARGET_OFFSET_NORTH_M='${PLANE2_ROUTE_POINT1_NORTH_M}'
-    export PX4_TARGET_OFFSET_EAST_M='${PLANE2_ROUTE_POINT1_EAST_M}'
-    export PX4_TARGET_OFFSET_ALT_M='${PLANE2_ROUTE_POINT_ALT_M}'
-    export PX4_LOITER_RADIUS_M='${PLANE2_ROUTE_LOITER_RADIUS_M}'
-    export PX4_GROUNDSPEED_M_S='${PLANE2_ROUTE_GROUNDSPEED_M_S}'"
-  sleep "${PLANE2_ROUTE_LEG_DWELL_SEC}"
+route_points_default() {
+  printf '%s;%s;%s;%s'     "${PLANE2_ROUTE_POINT1_NORTH_M},${PLANE2_ROUTE_POINT1_EAST_M}"     "${PLANE2_ROUTE_POINT2_NORTH_M},${PLANE2_ROUTE_POINT2_EAST_M}"     "${PLANE2_ROUTE_POINT3_NORTH_M},${PLANE2_ROUTE_POINT3_EAST_M}"     "${PLANE2_ROUTE_POINT4_NORTH_M},${PLANE2_ROUTE_POINT4_EAST_M}"
+}
 
-  run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" 'do_reposition' "${PLANE2_SYS_ID}" "${PLANE2_ROUTE_POINT2_LOG}" "    export PX4_TARGET_OFFSET_NORTH_M='${PLANE2_ROUTE_POINT2_NORTH_M}'
-    export PX4_TARGET_OFFSET_EAST_M='${PLANE2_ROUTE_POINT2_EAST_M}'
-    export PX4_TARGET_OFFSET_ALT_M='${PLANE2_ROUTE_POINT_ALT_M}'
-    export PX4_LOITER_RADIUS_M='${PLANE2_ROUTE_LOITER_RADIUS_M}'
-    export PX4_GROUNDSPEED_M_S='${PLANE2_ROUTE_GROUNDSPEED_M_S}'"
-  sleep "${PLANE2_ROUTE_LEG_DWELL_SEC}"
+print_live_rival_route() {
+  local route_spec="${PLANE2_ROUTE_POINTS_RAW:-$(route_points_default)}"
+  local -a route_points=()
+  local route_point=""
+  local north_m=""
+  local east_m=""
+  local extra=""
+  local leg_index=0
 
-  run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" 'do_reposition' "${PLANE2_SYS_ID}" "${PLANE2_ROUTE_POINT3_LOG}" "    export PX4_TARGET_OFFSET_NORTH_M='${PLANE2_ROUTE_POINT3_NORTH_M}'
-    export PX4_TARGET_OFFSET_EAST_M='${PLANE2_ROUTE_POINT3_EAST_M}'
-    export PX4_TARGET_OFFSET_ALT_M='${PLANE2_ROUTE_POINT_ALT_M}'
-    export PX4_LOITER_RADIUS_M='${PLANE2_ROUTE_LOITER_RADIUS_M}'
-    export PX4_GROUNDSPEED_M_S='${PLANE2_ROUTE_GROUNDSPEED_M_S}'"
-  sleep "${PLANE2_ROUTE_LEG_DWELL_SEC}"
+  IFS=';' read -r -a route_points <<< "${route_spec}"
+  echo "resolved live-rival route:"
+  for route_point in "${route_points[@]}"; do
+    route_point="${route_point//[$'\t\r\n ']/}"
+    [[ -z "${route_point}" ]] && continue
+    IFS=',' read -r north_m east_m extra <<< "${route_point}"
+    if [[ -z "${north_m}" || -z "${east_m}" || -n "${extra:-}" ]]; then
+      echo "invalid PHASE6_LIVE_RIVAL_ROUTE_POINTS entry: '${route_point}' (expected north,east)" >&2
+      exit 2
+    fi
+    leg_index=$((leg_index + 1))
+    printf '  - point %d: north=%s east=%s alt=%s groundspeed=%s dwell=%s
+'       "${leg_index}"       "${north_m}"       "${east_m}"       "${PLANE2_ROUTE_POINT_ALT_M}"       "${PLANE2_ROUTE_GROUNDSPEED_M_S}"       "${PLANE2_ROUTE_LEG_DWELL_SEC}"
+  done
+  if [[ "${leg_index}" -lt 2 ]]; then
+    echo "live-rival route must contain at least 2 waypoints" >&2
+    exit 2
+  fi
+}
 
-  run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" 'do_reposition' "${PLANE2_SYS_ID}" "${PLANE2_ROUTE_POINT4_LOG}" "    export PX4_TARGET_OFFSET_NORTH_M='${PLANE2_ROUTE_POINT4_NORTH_M}'
-    export PX4_TARGET_OFFSET_EAST_M='${PLANE2_ROUTE_POINT4_EAST_M}'
+run_route_leg() {
+  local leg_index="$1"
+  local north_m="$2"
+  local east_m="$3"
+  local output_file="$4"
+
+  run_navigation_command "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" 'do_reposition' "${PLANE2_SYS_ID}" "${output_file}" "    export PX4_TARGET_OFFSET_NORTH_M='${north_m}'
+    export PX4_TARGET_OFFSET_EAST_M='${east_m}'
     export PX4_TARGET_OFFSET_ALT_M='${PLANE2_ROUTE_POINT_ALT_M}'
     export PX4_LOITER_RADIUS_M='${PLANE2_ROUTE_LOITER_RADIUS_M}'
     export PX4_GROUNDSPEED_M_S='${PLANE2_ROUTE_GROUNDSPEED_M_S}'"
+}
+
+run_live_rival_route() {
+  local route_spec="${PLANE2_ROUTE_POINTS_RAW:-$(route_points_default)}"
+  local -a route_points=()
+  local route_point=""
+  local north_m=""
+  local east_m=""
+  local extra=""
+  local leg_index=0
+
+  IFS=';' read -r -a route_points <<< "${route_spec}"
+  for route_point in "${route_points[@]}"; do
+    route_point="${route_point//[$'\t\r\n ']/}"
+    [[ -z "${route_point}" ]] && continue
+    IFS=',' read -r north_m east_m extra <<< "${route_point}"
+    if [[ -z "${north_m}" || -z "${east_m}" || -n "${extra:-}" ]]; then
+      echo "invalid PHASE6_LIVE_RIVAL_ROUTE_POINTS entry: '${route_point}' (expected north,east)" >&2
+      return 2
+    fi
+    leg_index=$((leg_index + 1))
+    run_route_leg "${leg_index}" "${north_m}" "${east_m}" "${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-route-leg${leg_index}.log"
+    if (( leg_index < ${#route_points[@]} )); then
+      sleep "${PLANE2_ROUTE_LEG_DWELL_SEC}"
+    fi
+  done
+
+  if [[ "${leg_index}" -lt 2 ]]; then
+    echo "live-rival route must contain at least 2 waypoints" >&2
+    return 2
+  fi
 }
 
 run_local_position_waiter() {
@@ -406,6 +456,28 @@ wait_for_state() {
   return 1
 }
 
+wait_for_compose_services() {
+  local timeout_sec="$1"
+  local running_services
+  local compose_service
+  for ((i = 1; i <= timeout_sec; i++)); do
+    running_services="$(${COMPOSE_CMD[@]} ${COMPOSE_ARGS[@]} ps --services --status running)"
+    local all_running=1
+    for compose_service in gazebo referee_server xrce_agent ros2_app; do
+      if ! grep -qx "${compose_service}" <<<"${running_services}"; then
+        all_running=0
+        break
+      fi
+    done
+    if [[ "${all_running}" == "1" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "timed out waiting for compose services to reach running state" >&2
+  return 1
+}
+
 read_cue_error() {
   ros2_exec 'set -euo pipefail; set +u; source /opt/ros/humble/setup.bash >/dev/null 2>&1; source /workspaces/ros2_ws/install/setup.bash >/dev/null 2>&1; set -u; timeout 10 ros2 topic echo --once /guidance/camera_cue_error_deg 2>/dev/null || true' | awk '/data:/{print $2; exit}'
 }
@@ -517,6 +589,7 @@ PLANE2_ROUTE_POINT_ALT_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT_ALT_M:-0.0}"
 PLANE2_ROUTE_LEG_DWELL_SEC="${PHASE6_LIVE_RIVAL_STRAIGHT_LEG_DWELL_SEC:-8}"
 PLANE2_ROUTE_LOITER_RADIUS_M="${PHASE6_LIVE_RIVAL_STRAIGHT_LOITER_RADIUS_M:-20.0}"
 PLANE2_ROUTE_GROUNDSPEED_M_S="${PHASE6_LIVE_RIVAL_STRAIGHT_GROUNDSPEED_M_S:-12.0}"
+PLANE2_ROUTE_POINTS_RAW="${PHASE6_LIVE_RIVAL_ROUTE_POINTS:-}"
 CUE_THRUST_X="${PHASE6_CUE_THRUST_X:-0.66}"
 CUE_MIN_THRUST_X="${PHASE6_CUE_MIN_THRUST_X:-0.36}"
 CUE_RANGE_THRUST_GAIN="${PHASE6_CUE_RANGE_THRUST_GAIN:-0.02}"
@@ -550,15 +623,22 @@ TOPICS
 
 echo "iconom phase-6 live-rival geometry hardening check"
 echo "gui mode: ${USE_GUI}"
+if [[ -n "${PLANE2_ROUTE_POINTS_RAW}" ]]; then
+  echo "live-rival route points: ${PLANE2_ROUTE_POINTS_RAW}"
+else
+  echo "live-rival route points: default straight route"
+fi
 echo
 echo "this checks the standalone real-sim live-rival geometry hardening slice:"
 echo "  - plane_01 and plane_02 start in the shared phase-4 runtime"
 echo "  - both aircraft take off and stabilize"
 echo "  - plane_02 publishes live rival state into /competition/rival/state"
 echo "  - plane_01 runs the maintained phase-6 cueing path against the real plane_02 target"
-echo "  - plane_02 flies a longer straight live-rival route to isolate stern-chase locking"
+echo "  - plane_02 flies a configurable live-rival route to isolate stern-chase locking"
 echo "  - recorded ownship-versus-rival geometry shows a sustained airborne stern-chase hold in the forward cone while keeping an env-driven trailing range and heading alignment"
 echo "  - after cueing, both aircraft must complete a successful landing"
+echo
+print_live_rival_route
 echo
 
 echo "step 1: validating compose config"
@@ -576,14 +656,7 @@ for service in gazebo referee_server xrce_agent ros2_app; do
   sleep 2
 done
 
-RUNNING_SERVICES="$(${COMPOSE_CMD[@]} ${COMPOSE_ARGS[@]} ps --services --status running)"
-for service in gazebo referee_server xrce_agent ros2_app; do
-  if ! grep -qx "${service}" <<<"${RUNNING_SERVICES}"; then
-    echo "${service} did not reach running state before phase-6 live-rival cueing" >&2
-    "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" logs "${service}" || true
-    exit 111
-  fi
-done
+wait_for_compose_services 60
 
 echo "step 5: preparing PX4 message, control, competition, and guidance packages"
 ros2_exec "
@@ -707,8 +780,8 @@ fi
 
 echo "initial cue error: ${INITIAL_CUE_ERROR} deg"
 
-echo "step 15: starting the live-rival straight route on plane_02"
-run_live_rival_straight_route >"${PLANE2_REPOSITION_LOG}" 2>&1 &
+echo "step 15: starting the live-rival route on plane_02"
+run_live_rival_route >"${PLANE2_REPOSITION_LOG}" 2>&1 &
 RIVAL_ROUTE_PID=$!
 
 echo "step 16: confirming the cueing bridge emits PX4 attitude offboard setpoints"
