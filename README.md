@@ -458,19 +458,43 @@ To run the GUI live-rival geometry hardening check:
 
 ```bash
 xhost +local:docker
-ICONOM_USE_GUI=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-geometry.sh --incremental
+ICONOM_USE_GUI=1 ICONOM_USE_NVIDIA=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-geometry.sh --incremental
 ```
 
 This standalone check is not part of `phase6-acceptance.sh` yet. It exists to harden the meaning of live-rival cueing with recorded route-comparison evidence before phase 7 visual-lock work.
 
-To view the ownship camera feed from inside the running `ros2_app` container while the GUI sim is active:
+To run the GUI phase-6 test and open the ownship camera in `rqt_image_view`, use two terminals.
+
+Terminal 1:
 
 ```bash
+cd /home/joseph/Projects/iconom
 xhost +local:docker
+ICONOM_USE_GUI=1 ICONOM_USE_NVIDIA=1 PX4_HEADLESS=0 ./scripts/check-phase6-live-rival-geometry.sh --incremental
+```
+
+Terminal 2:
+
+```bash
+cd /home/joseph/Projects/iconom
 ./scripts/view-phase6-ownship-camera.sh
 ```
 
 The helper now starts `ros_gz_bridge` automatically if it is not already running and waits for the requested camera topic to appear before opening `rqt_image_view`. The helper defaults to `/plane_01/camera/image_raw`. Override the topic with `CAMERA_TOPIC=/plane_02/camera/image_raw` if you want the rival feed instead.
+
+To export the recorded GUI run as CZML after the test finishes:
+
+```bash
+cd /home/joseph/Projects/iconom
+python3 ./scripts/export-phase6-czml.py ./ros2_ws/.tmp-phase6-live-rival-geometry.csv
+```
+
+To run the CZML viewer server for that replay:
+
+```bash
+cd /home/joseph/Projects/iconom
+./scripts/serve-phase6-czml-viewer.sh
+```
 
 To view the same feed in a browser over rosbridge while the sim is running:
 
