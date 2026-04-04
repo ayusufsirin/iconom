@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-import time
 from typing import Optional
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
 from std_msgs.msg import String
+
+from .phase6_time import now_sec
 
 
 SELECTED_TARGET_TOPIC = "/guidance/selected_target"
@@ -48,7 +49,7 @@ class PursuitStateMachine(Node):
         )
 
     def _now(self) -> float:
-        return time.monotonic()
+        return now_sec(self)
 
     def _handle_selected_target(self, msg: PoseStamped) -> None:
         self.selected_target = msg

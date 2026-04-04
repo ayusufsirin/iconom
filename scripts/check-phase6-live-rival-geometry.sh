@@ -140,6 +140,8 @@ ros2_exec() {
   "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" exec -T ros2_app bash -lc "$1"
 }
 
+source "${ROOT_DIR}/scripts/phase6-sim-time.sh"
+
 run_status_waiter() {
   local namespace="$1"
   local status_topic="$2"
@@ -293,7 +295,7 @@ run_live_rival_route() {
     leg_index=$((leg_index + 1))
     run_route_leg "${leg_index}" "${north_m}" "${east_m}" "${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-route-leg${leg_index}.log"
     if (( leg_index < ${#route_points[@]} )); then
-      sleep "${PLANE2_ROUTE_LEG_DWELL_SEC}"
+      wait_for_sim_seconds "${PLANE2_ROUTE_LEG_DWELL_SEC}" "live-rival route leg ${leg_index} dwell"
     fi
   done
 
@@ -463,7 +465,7 @@ wait_for_compose_services() {
   for ((i = 1; i <= timeout_sec; i++)); do
     running_services="$(${COMPOSE_CMD[@]} ${COMPOSE_ARGS[@]} ps --services --status running)"
     local all_running=1
-    for compose_service in gazebo referee_server xrce_agent ros2_app; do
+    for compose_service in gazebo referee_server xrce_agent ros2_app ros_gz_bridge; do
       if ! grep -qx "${compose_service}" <<<"${running_services}"; then
         all_running=0
         break
@@ -618,6 +620,7 @@ ${PLANE1_LOCAL_POSITION_TOPIC}
 ${PLANE2_LOCAL_POSITION_TOPIC}
 ${PLANE1_GLOBAL_POSITION_TOPIC}
 ${PLANE2_GLOBAL_POSITION_TOPIC}
+/clock
 TOPICS
 )
 
@@ -647,11 +650,11 @@ echo "step 1: validating compose config"
 echo "step 2: clearing any stale iconom containers"
 "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" down --remove-orphans >/dev/null 2>&1 || true
 
-echo "step 3: building gazebo, referee_server, xrce_agent, ros2_app, px4, and px4_plane_02"
-"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build gazebo referee_server xrce_agent ros2_app px4 px4_plane_02
+echo "step 3: building gazebo, referee_server, xrce_agent, ros2_app, ros_gz_bridge, px4, and px4_plane_02"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" build gazebo referee_server xrce_agent ros2_app ros_gz_bridge px4 px4_plane_02
 
-echo "step 4: starting gazebo, referee_server, xrce_agent, and ros2_app"
-for service in gazebo referee_server xrce_agent ros2_app; do
+echo "step 4: starting gazebo, referee_server, xrce_agent, ros2_app, and ros_gz_bridge"
+for service in gazebo referee_server xrce_agent ros2_app ros_gz_bridge; do
   "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" up -d --no-deps "${service}"
   sleep 2
 done
@@ -723,7 +726,7 @@ ros2_exec "
   export REF_HOST='referee_server'
   export REF_PORT='45678'
   export AIRCRAFT_ID='${PLANE1_NAMESPACE}'
-  /workspaces/ros2_ws/install/bin/ownship_telemetry_adapter
+  /workspaces/ros2_ws/install/bin/ownship_telemetry_adapter --ros-args -p use_sim_time:=true
 " >"${OWNSHIP_ADAPTER_LOG}" 2>&1 &
 OWNSHIP_ADAPTER_PID=$!
 
@@ -735,32 +738,32 @@ ros2_exec "
   source /workspaces/ros2_ws/install/setup.bash
   set -u
   export RIVAL_AIRCRAFT_ID='${PLANE2_NAMESPACE}'
-  /workspaces/ros2_ws/install/bin/live_rival_state_adapter
+  /workspaces/ros2_ws/install/bin/live_rival_state_adapter --ros-args -p use_sim_time:=true
 " >"${RIVAL_ADAPTER_LOG}" 2>&1 &
 RIVAL_ADAPTER_PID=$!
 
 echo "step 12: starting predictor and phase-6 guidance nodes"
-ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/predictor" >"${PREDICTOR_LOG}" 2>&1 &
+ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/predictor --ros-args -p use_sim_time:=true" >"${PREDICTOR_LOG}" 2>&1 &
 PREDICTOR_PID=$!
-ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/target_selector" >"${SELECTOR_LOG}" 2>&1 &
+ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/target_selector --ros-args -p use_sim_time:=true" >"${SELECTOR_LOG}" 2>&1 &
 SELECTOR_PID=$!
-ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/intercept_planner --ros-args -p max_intercept_distance:=80.0" >"${PLANNER_LOG}" 2>&1 &
+ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/intercept_planner --ros-args -p use_sim_time:=true -p max_intercept_distance:=80.0" >"${PLANNER_LOG}" 2>&1 &
 PLANNER_PID=$!
-ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/pursuit_state_machine" >"${STATE_MACHINE_LOG}" 2>&1 &
+ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/pursuit_state_machine --ros-args -p use_sim_time:=true" >"${STATE_MACHINE_LOG}" 2>&1 &
 STATE_MACHINE_PID=$!
-ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/camera_cueing_bridge --ros-args -p vehicle_namespace:='${PLANE1_NAMESPACE}' -p publish_rate_hz:=20.0 -p thrust_x:=${CUE_THRUST_X} -p roll_angle_gain:=${CUE_ROLL_ANGLE_GAIN} -p max_roll_deg:=${CUE_MAX_ROLL_DEG} -p pitch_angle_deg:=${CUE_PITCH_ANGLE_DEG} -p pitch_angle_gain:=${CUE_PITCH_ANGLE_GAIN} -p max_pitch_deg:=${CUE_MAX_PITCH_DEG} -p altitude_error_deadband_m:=${CUE_ALTITUDE_ERROR_DEADBAND_M} -p min_thrust_x:=${CUE_MIN_THRUST_X} -p range_thrust_gain:=${CUE_RANGE_THRUST_GAIN} -p range_damping_gain:=${CUE_RANGE_DAMPING_GAIN} -p range_integral_gain:=${CUE_RANGE_INTEGRAL_GAIN} -p range_integral_limit:=${CUE_RANGE_INTEGRAL_LIMIT} -p target_chase_range_m:=${TARGET_CHASE_RANGE_M} -p chase_range_tolerance_m:=${CHASE_RANGE_TOLERANCE_M} -p capture_error_deg:=${CUE_CAPTURE_ERROR_DEG}" >"${CUEING_LOG}" 2>&1 &
+ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/camera_cueing_bridge --ros-args -p use_sim_time:=true -p vehicle_namespace:='${PLANE1_NAMESPACE}' -p publish_rate_hz:=20.0 -p thrust_x:=${CUE_THRUST_X} -p roll_angle_gain:=${CUE_ROLL_ANGLE_GAIN} -p max_roll_deg:=${CUE_MAX_ROLL_DEG} -p pitch_angle_deg:=${CUE_PITCH_ANGLE_DEG} -p pitch_angle_gain:=${CUE_PITCH_ANGLE_GAIN} -p max_pitch_deg:=${CUE_MAX_PITCH_DEG} -p altitude_error_deadband_m:=${CUE_ALTITUDE_ERROR_DEADBAND_M} -p min_thrust_x:=${CUE_MIN_THRUST_X} -p range_thrust_gain:=${CUE_RANGE_THRUST_GAIN} -p range_damping_gain:=${CUE_RANGE_DAMPING_GAIN} -p range_integral_gain:=${CUE_RANGE_INTEGRAL_GAIN} -p range_integral_limit:=${CUE_RANGE_INTEGRAL_LIMIT} -p target_chase_range_m:=${TARGET_CHASE_RANGE_M} -p chase_range_tolerance_m:=${CHASE_RANGE_TOLERANCE_M} -p capture_error_deg:=${CUE_CAPTURE_ERROR_DEG}" >"${CUEING_LOG}" 2>&1 &
 CUEING_PID=$!
 
 wait_for_topics $'/competition/ownship/state\n/competition/rival/state\n/competition/prediction/rival_position\n/guidance/selected_target\n/guidance/intercept_target\n/guidance/pursuit_state\n/guidance/camera_cue_error_deg' 30
 wait_for_state pursue 30
 
 echo "step 12b: starting the live-rival geometry monitor"
-ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/cue_geometry_monitor --ros-args -p publish_period_sec:=0.2 -p forward_cone_deg:=${FINAL_CUE_ERROR_MAX_DEG} -p output_csv:='${CONTAINER_CSV_PATH}'" >"${MONITOR_LOG}" 2>&1 &
+ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/cue_geometry_monitor --ros-args -p use_sim_time:=true -p publish_period_sec:=0.2 -p forward_cone_deg:=${FINAL_CUE_ERROR_MAX_DEG} -p output_csv:='${CONTAINER_CSV_PATH}'" >"${MONITOR_LOG}" 2>&1 &
 MONITOR_PID=$!
 wait_for_topics "" 30
 
 echo "step 13: letting the geometry monitor capture the initial baseline"
-sleep 3
+wait_for_sim_seconds 3 "initial geometry baseline"
 echo "step 14: sampling the initial cue error"
 INITIAL_CUE_ERROR="$(read_cue_error)"
 if [[ -z "${INITIAL_CUE_ERROR}" ]]; then
@@ -802,7 +805,7 @@ run_vehicle_command "${PLANE1_NAMESPACE}" "${PLANE1_COMMAND_TOPIC}" "${PLANE1_AC
 run_status_waiter "${PLANE1_NAMESPACE}" "${PLANE1_STATUS_TOPIC}" "${PLANE1_STATUS_LOG}" "${STATUS_TIMEOUT_SEC}" '' "${OFFBOARD_NAV_STATE}" ''
 
 echo "step 18: running the live-rival geometry capture window before CSV validation"
-sleep "${CUE_WINDOW_SEC}"
+wait_for_sim_seconds "${CUE_WINDOW_SEC}" "live-rival geometry capture window"
 
 echo "step 19: stopping live-rival geometry capture and landing both aircraft"
 stop_pid "${CUEING_PID}"

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import csv
 import math
-import time
 from pathlib import Path
 from typing import Optional
 
@@ -9,6 +8,8 @@ import rclpy
 from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
 from std_msgs.msg import Float32, String
+
+from .phase6_time import now_sec
 
 OWNSHIP_STATE_TOPIC = "/competition/ownship/state"
 RIVAL_STATE_TOPIC = "/competition/rival/state"
@@ -119,11 +120,11 @@ class CueGeometryMonitor(Node):
 
     def _handle_selected_target(self, msg: PoseStamped) -> None:
         self.selected_target = msg
-        self.selected_target_at = time.monotonic()
+        self.selected_target_at = now_sec(self)
 
     def _handle_intercept_target(self, msg: PoseStamped) -> None:
         self.intercept_target = msg
-        self.intercept_target_at = time.monotonic()
+        self.intercept_target_at = now_sec(self)
 
     def _handle_cue_error(self, msg: Float32) -> None:
         self.last_cue_error_deg = float(msg.data)
@@ -162,7 +163,7 @@ class CueGeometryMonitor(Node):
         if self.ownship_state is None or self.rival_state is None:
             return
 
-        now = time.monotonic()
+        now = now_sec(self)
         if self.start_time is None:
             self.start_time = now
         t_sec = now - self.start_time

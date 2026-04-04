@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import math
-import time
 from typing import Optional
 
 import rclpy
@@ -9,6 +8,8 @@ from px4_msgs.msg import OffboardControlMode, VehicleAttitudeSetpoint
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Float32, String
+
+from .phase6_time import now_sec
 
 
 OWNSHIP_STATE_TOPIC = "/competition/ownship/state"
@@ -206,7 +207,7 @@ class CameraCueingBridge(Node):
         )
 
     def _now(self) -> float:
-        return time.monotonic()
+        return now_sec(self)
 
     def _reset_longitudinal_controller(self) -> None:
         self.previous_aft_distance_m = None
