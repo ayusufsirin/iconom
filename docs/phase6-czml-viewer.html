@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -33,7 +33,13 @@
         margin: 0;
         overflow: hidden;
         background: var(--bg);
-        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
       }
 
       #hud {
@@ -51,9 +57,24 @@
       }
 
       #hud h1 {
-        margin: 0 0 8px;
+        margin: 0;
         font-size: 20px;
       }
+      #hudHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      #hudBody {
+        margin-top: 8px;
+      }
+
+      #hud.collapsed #hudBody {
+        display: none;
+      }
+
 
       #hud p {
         margin: 0 0 10px;
@@ -84,6 +105,27 @@
         color: var(--muted);
       }
 
+      select {
+        width: 100%;
+        margin-top: 10px;
+        min-height: 180px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--panel-border);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+      }
+
+      .hint {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
       button {
         padding: 10px 14px;
         border: 0;
@@ -106,7 +148,9 @@
         border-radius: 14px;
         text-align: center;
         color: var(--muted);
-        transition: border-color 120ms ease, background 120ms ease;
+        transition:
+          border-color 120ms ease,
+          background 120ms ease;
       }
 
       #dropZone.active {
@@ -134,28 +178,62 @@
     <div id="cesiumContainer"></div>
 
     <section id="hud">
-      <h1>Phase 6 CZML Viewer</h1>
-      <p>
-        Load a replay exported by <code>scripts/export-phase6-czml.py</code>. You can drag and drop a
-        <code>.czml</code> file, choose one from disk, or load a same-origin path served from this repo.
-      </p>
-      <p><strong>Phase colors:</strong> capture = blue, settle = amber, follow lock = teal, follow hold = green, recovery = red. White markers show transition points.</p>
-
-      <div class="row">
-        <input id="pathInput" type="text" value="/ros2_ws/.tmp-phase6-live-rival-geometry.csv.czml" />
-        <button id="loadPathButton">Load Path</button>
+      <div id="hudHeader">
+        <h1>Phase 6 CZML Viewer</h1>
+        <button id="toggleHudButton" class="secondary">Collapse Panel</button>
       </div>
 
-      <input id="fileInput" type="file" accept=".czml,.json,application/json" />
+      <div id="hudBody">
+        <p>
+          Load a replay exported by <code>scripts/export-phase6-czml.py</code>.
+          You can drag and drop a <code>.czml</code> file, choose one from disk,
+          load a same-origin path served from this repo, or use the server-side
+          replay browser below.
+        </p>
+        <p>
+          <strong>Phase colors:</strong> capture = blue, settle = amber, follow
+          lock = teal, follow hold = green, recovery = red. White markers show
+          transition points.
+        </p>
 
-      <div id="dropZone">Drop a <code>.czml</code> file here</div>
+        <div class="row">
+          <input
+            id="pathInput"
+            type="text"
+            value="/ros2_ws/.tmp-phase6-live-rival-geometry.csv.czml"
+          />
+          <button id="loadPathButton">Load Path</button>
+        </div>
 
-      <div class="row">
-        <button id="fitButton" class="secondary">Refit View</button>
-        <button id="clearButton" class="secondary">Clear Replay</button>
+        <p class="hint">
+          The disk picker uses the browser machine. For remote use, refresh the
+          server-side file list and load a replay directly from the server.
+        </p>
+
+        <div class="row">
+          <button id="refreshServerFilesButton" class="secondary">
+            Refresh Server Files
+          </button>
+          <button id="loadSelectedServerFileButton" class="secondary">
+            Load Selected
+          </button>
+        </div>
+
+        <select id="serverFileSelect" size="8">
+          <option value="">Scanning server-side CZML files ...</option>
+        </select>
+
+        <input id="fileInput" type="file" accept=".czml,.json,application/json" />
+
+        <div id="dropZone">Drop a <code>.czml</code> file here</div>
+
+        <div class="row">
+          <button id="fitButton" class="secondary">Refit View</button>
+          <button id="clearButton" class="secondary">Clear Replay</button>
+        </div>
+
+        <div id="status">Waiting for replay input.</div>
       </div>
-
-      <div id="status">Waiting for replay input.</div>
     </section>
 
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Cesium.js"></script>
@@ -165,6 +243,15 @@
       const fileInput = document.getElementById("fileInput");
       const pathInput = document.getElementById("pathInput");
       const loadPathButton = document.getElementById("loadPathButton");
+      const refreshServerFilesButton = document.getElementById(
+        "refreshServerFilesButton",
+      );
+      const loadSelectedServerFileButton = document.getElementById(
+        "loadSelectedServerFileButton",
+      );
+      const toggleHudButton = document.getElementById("toggleHudButton");
+      const hud = document.getElementById("hud");
+      const serverFileSelect = document.getElementById("serverFileSelect");
       const fitButton = document.getElementById("fitButton");
       const clearButton = document.getElementById("clearButton");
 
@@ -188,6 +275,7 @@
       viewer.clock.shouldAnimate = true;
 
       let activeDataSource = null;
+      let hudCollapsed = false;
 
       function setStatus(message, isError = false) {
         statusEl.textContent = message;
@@ -212,7 +300,10 @@
           await replaceDataSource(dataSource, sourceLabel);
         } catch (error) {
           console.error(error);
-          setStatus(`Failed to load replay from ${sourceLabel}: ${error.message}`, true);
+          setStatus(
+            `Failed to load replay from ${sourceLabel}: ${error.message}`,
+            true,
+          );
         }
       }
 
@@ -245,6 +336,112 @@
         }
       }
 
+      function setServerFileList(paths) {
+        serverFileSelect.innerHTML = "";
+        if (paths.length === 0) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "No server-side CZML files found";
+          serverFileSelect.appendChild(option);
+          return;
+        }
+        for (const path of paths) {
+          const option = document.createElement("option");
+          option.value = path;
+          option.textContent = path;
+          if (path === pathInput.value.trim()) {
+            option.selected = true;
+          }
+          serverFileSelect.appendChild(option);
+        }
+      }
+
+      async function scanServerDirectory(rootPath, maxDepth = 3) {
+        const visited = new Set();
+        const results = new Set();
+        const skipDirNames = new Set([
+          "../",
+          "build/",
+          "install/",
+          "log/",
+          "src/",
+        ]);
+
+        async function scan(path, depth) {
+          if (visited.has(path) || depth > maxDepth) {
+            return;
+          }
+          visited.add(path);
+
+          const response = await fetch(path);
+          if (response.ok === false) {
+            throw new Error("HTTP " + response.status + " at " + path);
+          }
+
+          const html = await response.text();
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          const links = Array.from(doc.querySelectorAll("a"));
+          for (const link of links) {
+            const href = link.getAttribute("href");
+            if (href === null || href === "" || skipDirNames.has(href)) {
+              continue;
+            }
+            const resolved = new URL(
+              href,
+              new URL(path, window.location.origin),
+            );
+            const resolvedPath = resolved.pathname;
+            if (resolvedPath.startsWith(rootPath) === false) {
+              continue;
+            }
+            if (href.endsWith("/")) {
+              await scan(resolvedPath, depth + 1);
+              continue;
+            }
+            if (resolvedPath.endsWith(".czml")) {
+              results.add(resolvedPath);
+            }
+          }
+        }
+
+        await scan(rootPath, 0);
+        return Array.from(results).sort((a, b) => b.localeCompare(a));
+      }
+
+      async function refreshServerFiles() {
+        try {
+          setStatus("Scanning server-side CZML files under /ros2_ws/ ...");
+          const paths = await scanServerDirectory("/ros2_ws/", 3);
+          setServerFileList(paths);
+          if (paths.length === 0) {
+            setStatus("No server-side CZML files found under /ros2_ws/.", true);
+            return;
+          }
+          if (
+            pathInput.value.trim() === "" ||
+            paths.includes(pathInput.value.trim()) === false
+          ) {
+            pathInput.value = paths[0];
+          }
+          setStatus("Found " + paths.length + " server-side CZML files.");
+        } catch (error) {
+          console.error(error);
+          setServerFileList([]);
+          setStatus(
+            "Failed to scan server-side CZML files: " + error.message,
+            true,
+          );
+        }
+      }
+
+      function setHudCollapsed(collapsed) {
+        hudCollapsed = collapsed;
+        hud.classList.toggle("collapsed", collapsed);
+        toggleHudButton.textContent = collapsed
+          ? "Expand Panel"
+          : "Collapse Panel";
+      }
+
       function clearReplay() {
         if (!activeDataSource) {
           setStatus("No replay is loaded.");
@@ -255,8 +452,37 @@
         setStatus("Replay cleared.");
       }
 
-      loadPathButton.addEventListener("click", () => loadFromPath(pathInput.value));
-      fileInput.addEventListener("change", (event) => loadFromFile(event.target.files[0]));
+      loadPathButton.addEventListener("click", () =>
+        loadFromPath(pathInput.value),
+      );
+      refreshServerFilesButton.addEventListener("click", () =>
+        refreshServerFiles(),
+      );
+      loadSelectedServerFileButton.addEventListener("click", () => {
+        if (!serverFileSelect.value) {
+          setStatus("Choose a server-side CZML file first.", true);
+          return;
+        }
+        pathInput.value = serverFileSelect.value;
+        loadFromPath(serverFileSelect.value);
+      });
+      toggleHudButton.addEventListener("click", () =>
+        setHudCollapsed(!hudCollapsed),
+      );
+      serverFileSelect.addEventListener("change", () => {
+        if (serverFileSelect.value) {
+          pathInput.value = serverFileSelect.value;
+        }
+      });
+      serverFileSelect.addEventListener("dblclick", () => {
+        if (serverFileSelect.value) {
+          pathInput.value = serverFileSelect.value;
+          loadFromPath(serverFileSelect.value);
+        }
+      });
+      fileInput.addEventListener("change", (event) =>
+        loadFromFile(event.target.files[0]),
+      );
       fitButton.addEventListener("click", () => {
         if (activeDataSource) {
           viewer.flyTo(activeDataSource);
@@ -270,13 +496,17 @@
         event.preventDefault();
         dropZone.classList.add("active");
       });
-      dropZone.addEventListener("dragleave", () => dropZone.classList.remove("active"));
+      dropZone.addEventListener("dragleave", () =>
+        dropZone.classList.remove("active"),
+      );
       dropZone.addEventListener("drop", async (event) => {
         event.preventDefault();
         dropZone.classList.remove("active");
         const file = event.dataTransfer.files[0];
         await loadFromFile(file);
       });
+
+      refreshServerFiles();
 
       const queryPath = new URLSearchParams(window.location.search).get("src");
       if (queryPath) {
