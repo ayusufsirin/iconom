@@ -19,7 +19,10 @@ class LiveRivalStateAdapter(Node):
         super().__init__("live_rival_state_adapter")
 
         self.declare_parameter("aircraft_id", AIRCRAFT_ID)
+        self.declare_parameter("publish_rate_hz", 20.0)
+
         self.aircraft_id = str(self.get_parameter("aircraft_id").value)
+        self.publish_rate_hz = float(self.get_parameter("publish_rate_hz").value)
         self.local_position_topic = f"/{self.aircraft_id}/fmu/out/vehicle_local_position"
 
         qos = QoSProfile(
@@ -29,6 +32,7 @@ class LiveRivalStateAdapter(Node):
         )
 
         self.latest_velocity = None
+        self.latest_msg = None
         self.rival_state_pub = self.create_publisher(PoseStamped, RIVAL_STATE_TOPIC, 10)
         self.position_sub = self.create_subscription(
             VehicleLocalPosition,
@@ -37,8 +41,11 @@ class LiveRivalStateAdapter(Node):
             qos,
         )
 
+        self.timer = self.create_timer(1.0 / self.publish_rate_hz, self._publish_rival)
+
         self.get_logger().info(
-            f"live rival adapter starting for {self.aircraft_id}; subscribing to {self.local_position_topic} and publishing {RIVAL_STATE_TOPIC}"
+            f"live rival adapter starting for {self.aircraft_id}; subscribing to {self.local_position_topic} "
+            f"and publishing {RIVAL_STATE_TOPIC} at {self.publish_rate_hz}Hz"
         )
 
     def _compute_heading(self) -> float:
@@ -52,6 +59,13 @@ class LiveRivalStateAdapter(Node):
 
     def _handle_position(self, msg: VehicleLocalPosition) -> None:
         self.latest_velocity = (float(msg.vx), float(msg.vy), float(msg.vz))
+        self.latest_msg = msg
+
+    def _publish_rival(self) -> None:
+        if self.latest_msg is None:
+            return
+
+        msg = self.latest_msg
         heading = self._compute_heading()
 
         rival = PoseStamped()

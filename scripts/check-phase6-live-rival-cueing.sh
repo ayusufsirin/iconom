@@ -583,6 +583,7 @@ ros2_exec "
 OWNSHIP_ADAPTER_PID=$!
 
 echo "step 11: starting the live plane_02 rival adapter"
+RIVAL_PUBLISH_RATE_HZ="${RIVAL_PUBLISH_RATE_HZ:-20.0}"
 ros2_exec "
   set -euo pipefail
   set +u
@@ -590,7 +591,7 @@ ros2_exec "
   source /workspaces/ros2_ws/install/setup.bash
   set -u
   export RIVAL_AIRCRAFT_ID='${PLANE2_NAMESPACE}'
-  /workspaces/ros2_ws/install/bin/live_rival_state_adapter
+  /workspaces/ros2_ws/install/bin/live_rival_state_adapter --ros-args -p publish_rate_hz:=\"${RIVAL_PUBLISH_RATE_HZ}\"
 " >"${RIVAL_ADAPTER_LOG}" 2>&1 &
 RIVAL_ADAPTER_PID=$!
 
