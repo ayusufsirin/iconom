@@ -489,6 +489,21 @@ cd /home/joseph/Projects/iconom
 python3 ./scripts/export-phase6-czml.py ./ros2_ws/.tmp-phase6-live-rival-geometry.csv
 ```
 
+To analyze the recorded geometry and generate a visual report:
+
+```bash
+cd /home/joseph/Projects/iconom
+python3 ./scripts/analyze_chasing.py
+```
+
+This generates a comprehensive report with:
+- Mission overview and phase breakdown
+- follow_lock statistics (range, bearing error, camera cue error)
+- Lock acquisition summary
+- Forward cone and intercept tracking metrics
+
+The report is printed to console and saved to `ros2_ws/chasing_report.txt`.
+
 To run the CZML viewer server for that replay:
 
 ```bash
