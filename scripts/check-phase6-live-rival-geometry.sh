@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
 OVERRIDE_FILE="${ROOT_DIR}/docker-compose.override.yml"
+NVIDIA_OVERRIDE_FILE="${ROOT_DIR}/docker-compose.nvidia.yml"
 ENV_FILE="${ROOT_DIR}/.env.example"
 COMPOSE_CMD=(docker compose)
 COMPOSE_ARGS=(--profile phase4 --profile phase5 --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
@@ -529,6 +530,7 @@ if ! "${COMPOSE_CMD[@]}" version >/dev/null 2>&1; then
 fi
 
 USE_GUI="${ICONOM_USE_GUI:-0}"
+USE_NVIDIA="${ICONOM_USE_NVIDIA:-0}"
 if [[ "${USE_GUI}" == "1" || "${PX4_HEADLESS:-1}" == "0" ]]; then
   require_file "${OVERRIDE_FILE}"
   if [[ -z "${DISPLAY:-}" ]]; then
@@ -536,6 +538,11 @@ if [[ "${USE_GUI}" == "1" || "${PX4_HEADLESS:-1}" == "0" ]]; then
     exit 219
   fi
   COMPOSE_ARGS+=(-f "${OVERRIDE_FILE}")
+fi
+
+if [[ "${USE_NVIDIA}" == "1" ]]; then
+  require_file "${NVIDIA_OVERRIDE_FILE}"
+  COMPOSE_ARGS+=(-f "${NVIDIA_OVERRIDE_FILE}")
 fi
 
 PLANE1_NAMESPACE='plane_01'
@@ -626,6 +633,7 @@ TOPICS
 
 echo "iconom phase-6 live-rival geometry hardening check"
 echo "gui mode: ${USE_GUI}"
+echo "nvidia mode: ${USE_NVIDIA}"
 if [[ -n "${PLANE2_ROUTE_POINTS_RAW}" ]]; then
   echo "live-rival route points: ${PLANE2_ROUTE_POINTS_RAW}"
 else
