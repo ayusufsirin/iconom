@@ -754,11 +754,13 @@ RIVAL_ADAPTER_PID=$!
 echo "step 12: starting predictor and phase-6 guidance nodes"
 TARGET_SELECTOR_RATE_HZ="${TARGET_SELECTOR_RATE_HZ:-20}"
 SELECTOR_PERIOD_SEC=$(echo "scale=4; 1 / ${TARGET_SELECTOR_RATE_HZ}" | bc)
+INTERCEPT_PLANNER_RATE_HZ="${INTERCEPT_PLANNER_RATE_HZ:-20}"
+PLANNER_PERIOD_SEC=$(echo "scale=4; 1 / ${INTERCEPT_PLANNER_RATE_HZ}" | bc)
 ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/predictor --ros-args -p use_sim_time:=true" >"${PREDICTOR_LOG}" 2>&1 &
 PREDICTOR_PID=$!
 ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/target_selector --ros-args -p use_sim_time:=true -p publish_period_sec:=\"${SELECTOR_PERIOD_SEC}\"" >"${SELECTOR_LOG}" 2>&1 &
 SELECTOR_PID=$!
-ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/intercept_planner --ros-args -p use_sim_time:=true -p max_intercept_distance:=80.0" >"${PLANNER_LOG}" 2>&1 &
+ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/intercept_planner --ros-args -p use_sim_time:=true -p max_intercept_distance:=80.0 -p publish_period_sec:=\"${PLANNER_PERIOD_SEC}\"" >"${PLANNER_LOG}" 2>&1 &
 PLANNER_PID=$!
 ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/pursuit_state_machine --ros-args -p use_sim_time:=true" >"${STATE_MACHINE_LOG}" 2>&1 &
 STATE_MACHINE_PID=$!
