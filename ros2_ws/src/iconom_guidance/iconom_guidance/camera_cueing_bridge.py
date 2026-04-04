@@ -565,6 +565,10 @@ class CameraCueingBridge(Node):
         desired_aft_m = desired_capture_aft_m if self.longitudinal_phase in ("settle", "recovery") else desired_follow_aft_m
         aft_error_m = aft_distance_m - desired_aft_m
         overshoot_risk = self._overshoot_risk(aft_distance_m, desired_aft_m, closing_speed_mps)
+        follow_hold_entry_aft_band_m = max(self.hold_aft_error_band_m, self.chase_range_tolerance_m)
+        follow_hold_entry_closing_speed_max_mps = self.hold_closing_speed_max_mps + 0.5
+        follow_hold_exit_aft_band_m = follow_hold_entry_aft_band_m + self.hold_aft_error_band_m
+        follow_hold_exit_closing_speed_max_mps = follow_hold_entry_closing_speed_max_mps + 0.5
         tail_angle_deg, heading_alignment_error_deg = self._current_chase_geometry()
         settle_geometry_broken = (
             tail_angle_deg is None
@@ -696,8 +700,8 @@ class CameraCueingBridge(Node):
                     and range_to_target_m is not None
                     and range_to_target_m <= (self.target_chase_range_m + 2.0 * self.chase_range_tolerance_m)
                     and aft_distance_m >= self.target_chase_range_m
-                    and abs(aft_distance_m - self.target_chase_range_m) <= self.hold_aft_error_band_m
-                    and closing_speed_mps <= self.hold_closing_speed_max_mps
+                    and abs(aft_distance_m - self.target_chase_range_m) <= follow_hold_entry_aft_band_m
+                    and closing_speed_mps <= follow_hold_entry_closing_speed_max_mps
                 )
                 if follow_lock_ready:
                     now = self._now()
@@ -764,9 +768,9 @@ class CameraCueingBridge(Node):
                 else:
                     spacing_degraded = (
                         range_to_slot_m is not None
-                        and range_to_slot_m > (self.target_chase_range_m + self.chase_range_tolerance_m)
-                    ) or abs(aft_error_m) > self.hold_aft_error_band_m or (
-                        closing_speed_mps > (self.hold_closing_speed_max_mps + 0.5)
+                        and range_to_slot_m > (self.target_chase_range_m + 1.5 * self.chase_range_tolerance_m)
+                    ) or abs(aft_error_m) > follow_hold_exit_aft_band_m or (
+                        closing_speed_mps > follow_hold_exit_closing_speed_max_mps
                     )
                     if spacing_degraded:
                         self.longitudinal_phase = "follow_lock"
