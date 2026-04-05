@@ -15,6 +15,7 @@ import rclpy
 from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from std_msgs.msg import String
 
 
 REFEREE_STATE_TOPIC = "/competition/rival/state/referee"
@@ -50,6 +51,7 @@ class EKFFusion(Node):
 
         self.referee_received = False
         self.live_received = False
+        self.in_follow_lock = False
 
         qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -61,6 +63,8 @@ class EKFFusion(Node):
             PoseStamped, REFEREE_STATE_TOPIC, self._handle_referee, qos)
         self.live_sub = self.create_subscription(
             PoseStamped, LIVE_STATE_TOPIC, self._handle_live, qos)
+        self.longitudinal_sub = self.create_subscription(
+            String, '/guidance/longitudinal_phase', self._handle_phase, qos)
 
         self.fused_pub = self.create_publisher(PoseStamped, FUSED_STATE_TOPIC, 10)
         self.timer = self.create_timer(1.0 / self.publish_rate_hz, self._publish_fused)
@@ -82,7 +86,11 @@ class EKFFusion(Node):
         self._update_from_measurement(msg, is_referee=True)
 
     def _handle_live(self, msg: PoseStamped) -> None:
-        self._update_from_measurement(msg, is_referee=False)
+        if self.in_follow_lock:
+            self._update_from_measurement(msg, is_referee=False)
+
+    def _handle_phase(self, msg: String) -> None:
+        self.in_follow_lock = (msg.data.strip().lower() == "follow_lock")
 
     def _update_from_measurement(self, msg: PoseStamped, is_referee: bool) -> None:
         now = self.get_clock().now().nanoseconds / 1e9
