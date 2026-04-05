@@ -22,6 +22,7 @@ FIXTURE_CREDENTIALS = {"username": "test_pilot", "password": "test_pass_123"}
 FIXTURE_MODE = os.environ.get("COMPETITION_FIXTURE_MODE", "false").lower() == "true"
 
 OWNSHIP_TELEMETRY_TOPIC = "/competition/ownship/state"
+REFEREE_RIVAL_STATE_TOPIC = "/competition/rival/state/referee"
 
 
 class CompetitionClient(Node):
@@ -40,7 +41,7 @@ class CompetitionClient(Node):
         self.fixture_mode = self.get_parameter("fixture_mode").value
         
         self.rival_state_pub = self.create_publisher(
-            PoseStamped, "/competition/rival/state", 10)
+            PoseStamped, REFEREE_RIVAL_STATE_TOPIC, 10)
         self.ownship_state_pub = None
         if self.fixture_mode:
             self.ownship_state_pub = self.create_publisher(
