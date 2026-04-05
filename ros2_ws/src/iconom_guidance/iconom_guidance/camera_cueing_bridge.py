@@ -67,6 +67,7 @@ class CameraCueingBridge(Node):
         self.declare_parameter("closing_speed_filter_alpha", 0.35)
         self.declare_parameter("closing_speed_kp", 0.12)
         self.declare_parameter("closing_speed_ki", 0.0)
+        self.declare_parameter("closing_speed_kff", 0.005)
         self.declare_parameter("closing_speed_integral_limit", 0.5)
         self.declare_parameter("capture_closing_speed_max_mps", 6.0)
         self.declare_parameter("approach_closing_speed_max_mps", 2.5)
@@ -120,6 +121,7 @@ class CameraCueingBridge(Node):
         self.closing_speed_filter_alpha = float(self.get_parameter("closing_speed_filter_alpha").value)
         self.closing_speed_kp = float(self.get_parameter("closing_speed_kp").value)
         self.closing_speed_ki = float(self.get_parameter("closing_speed_ki").value)
+        self.closing_speed_kff = float(self.get_parameter("closing_speed_kff").value)
         self.closing_speed_integral_limit = float(self.get_parameter("closing_speed_integral_limit").value)
         self.capture_closing_speed_max_mps = float(self.get_parameter("capture_closing_speed_max_mps").value)
         self.approach_closing_speed_max_mps = float(self.get_parameter("approach_closing_speed_max_mps").value)
@@ -819,6 +821,7 @@ class CameraCueingBridge(Node):
 
         proportional_term = self.closing_speed_kp * speed_error
         integral_term = self.closing_speed_ki * self.integrated_speed_error
+        feed_forward_term = self.closing_speed_kff * self.target_velocity_x_mps
         base_thrust_x = self.min_thrust_x
         if self.longitudinal_phase == "settle":
             base_thrust_x = clamp(self.settle_min_thrust_x, self.min_thrust_x, self.max_thrust_x)
@@ -832,7 +835,7 @@ class CameraCueingBridge(Node):
                 base_thrust_x = self.min_thrust_x
             else:
                 base_thrust_x = clamp(self.settle_min_thrust_x, self.min_thrust_x, self.max_thrust_x)
-        commanded = base_thrust_x + proportional_term + integral_term
+        commanded = base_thrust_x + proportional_term + integral_term - feed_forward_term
         return (
             clamp(commanded, base_thrust_x, self.max_thrust_x),
             aft_distance_m,
