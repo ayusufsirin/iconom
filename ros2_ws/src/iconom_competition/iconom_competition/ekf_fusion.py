@@ -28,7 +28,7 @@ class EKFFusion(Node):
     def __init__(self) -> None:
         super().__init__("ekf_fusion")
 
-        self.declare_parameter("process_noise", 0.5)
+        self.declare_parameter("process_noise", 0.4)
         self.declare_parameter("observation_noise_referee", 0.01)
         self.declare_parameter("observation_noise_live", 0.1)
         self.declare_parameter("publish_rate_hz", 20.0)
