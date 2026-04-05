@@ -106,6 +106,8 @@ class CameraCueingBridge(Node):
         self.declare_parameter("target_propagation_max_sec", 1.0)
         self.declare_parameter("capture_error_deg", 20.0)
         self.declare_parameter("near_roll_scale", 0.35)
+        self.declare_parameter("use_fused_input", False)
+        self.declare_parameter("fused_state_topic", "/fusion/rival/state")
 
         namespace = str(self.get_parameter("vehicle_namespace").value)
         self.publish_rate_hz = float(self.get_parameter("publish_rate_hz").value)
@@ -157,6 +159,8 @@ class CameraCueingBridge(Node):
         self.target_propagation_max_sec = float(self.get_parameter("target_propagation_max_sec").value)
         self.capture_error_deg = float(self.get_parameter("capture_error_deg").value)
         self.near_roll_scale = float(self.get_parameter("near_roll_scale").value)
+        self.use_fused_input = bool(self.get_parameter("use_fused_input").value)
+        self.fused_state_topic = str(self.get_parameter("fused_state_topic").value)
 
         self.offboard_topic = f"/{namespace}/fmu/in/offboard_control_mode"
         self.attitude_topic = f"/{namespace}/fmu/in/vehicle_attitude_setpoint"
@@ -196,12 +200,15 @@ class CameraCueingBridge(Node):
         self.longitudinal_phase_pub = self.create_publisher(String, LONGITUDINAL_PHASE_TOPIC, 10)
         self.spacing_mode_pub = self.create_publisher(String, SPACING_MODE_TOPIC, 10)
         self.create_subscription(PoseStamped, OWNSHIP_STATE_TOPIC, self._handle_ownship_state, 10)
-        self.create_subscription(PoseStamped, SELECTED_TARGET_TOPIC, self._handle_selected_target, 10)
+
+        target_topic = self.fused_state_topic if self.use_fused_input else SELECTED_TARGET_TOPIC
+        self.create_subscription(PoseStamped, target_topic, self._handle_selected_target, 10)
         self.create_subscription(String, PURSUIT_STATE_TOPIC, self._handle_pursuit_state, 10)
         self.timer = self.create_timer(1.0 / self.publish_rate_hz, self._tick)
 
+        mode = "fused" if self.use_fused_input else "direct"
         self.get_logger().info(
-            f"camera cueing bridge listening on {OWNSHIP_STATE_TOPIC}, {SELECTED_TARGET_TOPIC}, and {PURSUIT_STATE_TOPIC}; "
+            f"camera cueing bridge listening on {OWNSHIP_STATE_TOPIC}, {target_topic} ({mode} mode), and {PURSUIT_STATE_TOPIC}; "
             f"publishing cue error on {CAMERA_CUE_ERROR_TOPIC}, longitudinal phase on {LONGITUDINAL_PHASE_TOPIC}, spacing mode on {SPACING_MODE_TOPIC}, "
             f"and offboard setpoints on {self.offboard_topic} / {self.attitude_topic}"
         )

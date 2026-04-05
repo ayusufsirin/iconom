@@ -12,6 +12,7 @@ from std_msgs.msg import Header
 
 AIRCRAFT_ID = os.environ.get("RIVAL_AIRCRAFT_ID", "plane_02")
 RIVAL_STATE_TOPIC = "/competition/rival/state"
+RIVAL_STATE_LIVE_TOPIC = "/competition/rival/state/live"
 
 
 class LiveRivalStateAdapter(Node):
@@ -34,6 +35,7 @@ class LiveRivalStateAdapter(Node):
         self.latest_velocity = None
         self.latest_msg = None
         self.rival_state_pub = self.create_publisher(PoseStamped, RIVAL_STATE_TOPIC, 10)
+        self.rival_state_live_pub = self.create_publisher(PoseStamped, RIVAL_STATE_LIVE_TOPIC, 10)
         self.position_sub = self.create_subscription(
             VehicleLocalPosition,
             self.local_position_topic,
@@ -80,6 +82,7 @@ class LiveRivalStateAdapter(Node):
         rival.pose.orientation.z = math.sin(heading / 2.0)
         rival.pose.orientation.w = math.cos(heading / 2.0)
         self.rival_state_pub.publish(rival)
+        self.rival_state_live_pub.publish(rival)
 
 
 def main(args=None) -> None:
