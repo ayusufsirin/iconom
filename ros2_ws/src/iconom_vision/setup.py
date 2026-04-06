@@ -19,6 +19,7 @@ setup(
     entry_points={
         "console_scripts": [
             "image_subscriber = iconom_vision.image_subscriber:main",
+            "camera_symbology_overlay = iconom_vision.camera_symbology_overlay:main",
         ],
     },
 )

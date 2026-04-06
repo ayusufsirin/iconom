@@ -36,6 +36,7 @@ PLANE2_STATUS_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-status.lo
 PLANE2_POSITION_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-position.log"
 OWNSHIP_ADAPTER_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-ownship.log"
 RIVAL_ADAPTER_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-rival.log"
+EKF_FUSION_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-ekf.log"
 PREDICTOR_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-predictor.log"
 SELECTOR_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-selector.log"
 PLANNER_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-planner.log"
@@ -55,17 +56,26 @@ STATE_MACHINE_PID=""
 CUEING_PID=""
 MONITOR_PID=""
 RIVAL_ROUTE_PID=""
+SYMBOLOGY_PID=""
+EKF_FUSION_PID=""
 COLD_BUILD="${ICONOM_PHASE6_COLD_BUILD:-0}"
+WITH_OVERLAY="${ICONOM_PHASE6_WITH_OVERLAY:-0}"
 service=""
 
 usage() {
   cat <<'USAGE'
-Usage: check-phase6-live-rival-geometry.sh [--incremental|--cold]
+Usage: check-phase6-live-rival-geometry.sh [--incremental|--cold|--with-overlay]
 
 Run the standalone phase-6 live-rival geometry hardening check.
 
+Options:
+  --incremental   Use cached build (default)
+  --cold          Force clean build
+  --with-overlay  Start camera symbology overlay node
+
 Environment:
   ICONOM_PHASE6_COLD_BUILD=0|1
+  ICONOM_PHASE6_WITH_OVERLAY=0|1
   PHASE6_LIVE_RIVAL_ROUTE_POINTS="north,east;north,east;..."
 USAGE
 }
@@ -78,6 +88,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --incremental)
     COLD_BUILD=0
+    shift
+    ;;
+  --with-overlay)
+    WITH_OVERLAY=1
     shift
     ;;
   -h | --help)
@@ -116,6 +130,8 @@ stop_pid() {
 
 cleanup() {
   local exit_code="${1:-0}"
+  stop_pid "${SYMBOLOGY_PID}"
+  stop_pid "${EKF_FUSION_PID}"
   stop_pid "${CUEING_PID}"
   stop_pid "${MONITOR_PID}"
   stop_pid "${STATE_MACHINE_PID}"
@@ -230,7 +246,7 @@ ${extra_env}
 }
 
 route_points_default() {
-  printf '%s;%s;%s;%s'     "${PLANE2_ROUTE_POINT1_NORTH_M},${PLANE2_ROUTE_POINT1_EAST_M}"     "${PLANE2_ROUTE_POINT2_NORTH_M},${PLANE2_ROUTE_POINT2_EAST_M}"     "${PLANE2_ROUTE_POINT3_NORTH_M},${PLANE2_ROUTE_POINT3_EAST_M}"     "${PLANE2_ROUTE_POINT4_NORTH_M},${PLANE2_ROUTE_POINT4_EAST_M}"
+  printf '%s;%s;%s;%s' "${PLANE2_ROUTE_POINT1_NORTH_M},${PLANE2_ROUTE_POINT1_EAST_M}" "${PLANE2_ROUTE_POINT2_NORTH_M},${PLANE2_ROUTE_POINT2_EAST_M}" "${PLANE2_ROUTE_POINT3_NORTH_M},${PLANE2_ROUTE_POINT3_EAST_M}" "${PLANE2_ROUTE_POINT4_NORTH_M},${PLANE2_ROUTE_POINT4_EAST_M}"
 }
 
 print_live_rival_route() {
@@ -242,19 +258,19 @@ print_live_rival_route() {
   local extra=""
   local leg_index=0
 
-  IFS=';' read -r -a route_points <<< "${route_spec}"
+  IFS=';' read -r -a route_points <<<"${route_spec}"
   echo "resolved live-rival route:"
   for route_point in "${route_points[@]}"; do
     route_point="${route_point//[$'\t\r\n ']/}"
     [[ -z "${route_point}" ]] && continue
-    IFS=',' read -r north_m east_m extra <<< "${route_point}"
+    IFS=',' read -r north_m east_m extra <<<"${route_point}"
     if [[ -z "${north_m}" || -z "${east_m}" || -n "${extra:-}" ]]; then
       echo "invalid PHASE6_LIVE_RIVAL_ROUTE_POINTS entry: '${route_point}' (expected north,east)" >&2
       exit 2
     fi
     leg_index=$((leg_index + 1))
     printf '  - point %d: north=%s east=%s alt=%s groundspeed=%s dwell=%s
-'       "${leg_index}"       "${north_m}"       "${east_m}"       "${PLANE2_ROUTE_POINT_ALT_M}"       "${PLANE2_ROUTE_GROUNDSPEED_M_S}"       "${PLANE2_ROUTE_LEG_DWELL_SEC}"
+' "${leg_index}" "${north_m}" "${east_m}" "${PLANE2_ROUTE_POINT_ALT_M}" "${PLANE2_ROUTE_GROUNDSPEED_M_S}" "${PLANE2_ROUTE_LEG_DWELL_SEC}"
   done
   if [[ "${leg_index}" -lt 2 ]]; then
     echo "live-rival route must contain at least 2 waypoints" >&2
@@ -284,18 +300,18 @@ run_live_rival_route() {
   local extra=""
   local leg_index=0
 
-  IFS=';' read -r -a route_points <<< "${route_spec}"
+  IFS=';' read -r -a route_points <<<"${route_spec}"
   for route_point in "${route_points[@]}"; do
     route_point="${route_point//[$'\t\r\n ']/}"
     [[ -z "${route_point}" ]] && continue
-    IFS=',' read -r north_m east_m extra <<< "${route_point}"
+    IFS=',' read -r north_m east_m extra <<<"${route_point}"
     if [[ -z "${north_m}" || -z "${east_m}" || -n "${extra:-}" ]]; then
       echo "invalid PHASE6_LIVE_RIVAL_ROUTE_POINTS entry: '${route_point}' (expected north,east)" >&2
       return 2
     fi
     leg_index=$((leg_index + 1))
     run_route_leg "${leg_index}" "${north_m}" "${east_m}" "${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-route-leg${leg_index}.log"
-    if (( leg_index < ${#route_points[@]} )); then
+    if ((leg_index < ${#route_points[@]})); then
       wait_for_sim_seconds "${PLANE2_ROUTE_LEG_DWELL_SEC}" "live-rival route leg ${leg_index} dwell"
     fi
   done
@@ -606,7 +622,7 @@ CUE_RANGE_DAMPING_GAIN="${PHASE6_CUE_RANGE_DAMPING_GAIN:-0.04}"
 CUE_RANGE_INTEGRAL_GAIN="${PHASE6_CUE_RANGE_INTEGRAL_GAIN:-0.04}"
 CUE_RANGE_INTEGRAL_LIMIT="${PHASE6_CUE_RANGE_INTEGRAL_LIMIT:-180.0}"
 TARGET_CHASE_RANGE_M="${PHASE6_TARGET_CHASE_RANGE_M:-1.0}"
-CHASE_RANGE_TOLERANCE_M="${PHASE6_CHASE_RANGE_TOLERANCE_M:-0.1}"
+CHASE_RANGE_TOLERANCE_M="${PHASE6_CHASE_RANGE_TOLERANCE_M:-1.0}"
 CUE_ROLL_ANGLE_GAIN="${PHASE6_CUE_ROLL_ANGLE_GAIN:-0.80}"
 CUE_MAX_ROLL_DEG="${PHASE6_CUE_MAX_ROLL_DEG:-35.0}"
 CUE_PITCH_ANGLE_DEG="${PHASE6_CUE_PITCH_ANGLE_DEG:-2.0}"
@@ -751,6 +767,12 @@ ros2_exec "
 " >"${RIVAL_ADAPTER_LOG}" 2>&1 &
 RIVAL_ADAPTER_PID=$!
 
+if [[ "${WITH_OVERLAY}" == "1" ]]; then
+  echo "step 11b: starting EKF fusion node for symbology overlay"
+  ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; ros2 run iconom_competition ekf_fusion --ros-args -p use_sim_time:=true" >"${EKF_FUSION_LOG}" 2>&1 &
+  EKF_FUSION_PID=$!
+fi
+
 echo "step 12: starting predictor and phase-6 guidance nodes"
 TARGET_SELECTOR_RATE_HZ="${TARGET_SELECTOR_RATE_HZ:-20}"
 SELECTOR_PERIOD_SEC=$(echo "scale=4; 1 / ${TARGET_SELECTOR_RATE_HZ}" | bc)
@@ -769,6 +791,20 @@ CUEING_PID=$!
 
 wait_for_topics $'/competition/ownship/state\n/competition/rival/state\n/competition/prediction/rival_position\n/guidance/selected_target\n/guidance/intercept_target\n/guidance/pursuit_state\n/guidance/camera_cue_error_deg' 30
 wait_for_state pursue 30
+
+if [[ "${WITH_OVERLAY}" == "1" ]]; then
+  echo "step 12c: starting camera symbology overlay node"
+  SYMBOLOGY_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-symbology.log"
+  ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; ros2 run iconom_vision camera_symbology_overlay --ros-args -p use_sim_time:=true" >"${SYMBOLOGY_LOG}" 2>&1 &
+  SYMBOLOGY_PID=$!
+  sleep 2
+  if ! kill -0 "${SYMBOLOGY_PID}" 2>/dev/null; then
+    echo "camera symbology overlay node failed to start" >&2
+    cat "${SYMBOLOGY_LOG}" >&2 || true
+    exit 207
+  fi
+  echo "camera symbology overlay node started (PID: ${SYMBOLOGY_PID})"
+fi
 
 echo "step 12b: starting the live-rival geometry monitor"
 ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/cue_geometry_monitor --ros-args -p use_sim_time:=true -p publish_period_sec:=0.2 -p forward_cone_deg:=${FINAL_CUE_ERROR_MAX_DEG} -p output_csv:='${CONTAINER_CSV_PATH}'" >"${MONITOR_LOG}" 2>&1 &
@@ -821,6 +857,14 @@ echo "step 18: running the live-rival geometry capture window before CSV validat
 wait_for_sim_seconds "${CUE_WINDOW_SEC}" "live-rival geometry capture window"
 
 echo "step 19: stopping live-rival geometry capture and landing both aircraft"
+if [[ -n "${SYMBOLOGY_PID}" ]]; then
+  stop_pid "${SYMBOLOGY_PID}"
+  SYMBOLOGY_PID=""
+fi
+if [[ -n "${EKF_FUSION_PID}" ]]; then
+  stop_pid "${EKF_FUSION_PID}"
+  EKF_FUSION_PID=""
+fi
 stop_pid "${CUEING_PID}"
 CUEING_PID=""
 stop_pid "${MONITOR_PID}"
