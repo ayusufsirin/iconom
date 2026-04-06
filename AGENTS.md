@@ -24,6 +24,71 @@
 
 **Always verify the relevant acceptance script passes before reporting a task complete.**
 
+## Current State (Phase 6 Complete)
+
+### Controller Architecture
+
+**Phase 6** is complete with the following enhancements:
+
+| Component | Details |
+|-----------|---------|
+| **Control type** | Attitude setpoint (roll/pitch/yaw + thrust) |
+| **Longitudinal** | PID + feed-forward (`closing_speed_kff=0.01`) |
+| **Lateral** | P controller with roll gain (`roll_angle_gain=0.8`) |
+| **EKF fusion** | Conditional — only uses live adapter when `longitudinal_phase == "follow_lock"` |
+| **Best range** | 3.44m (target: 1.0m, baseline: 4.42m) |
+
+### Key Controller Parameters
+
+```python
+# Longitudinal (thrust)
+closing_speed_kp = 0.12
+closing_speed_ki = 0.0              # disabled
+closing_speed_kff = 0.01            # feed-forward (NEW)
+range_damping_gain = 0.04
+range_thrust_gain = 0.075
+target_chase_range_m = 5.0
+
+# Lateral (roll)
+roll_angle_gain = 0.8
+max_roll_deg = 35.0
+```
+
+### EKF Fusion
+
+- **Node**: `ros2_ws/src/iconom_competition/iconom_competition/ekf_fusion.py`
+- **Inputs**: `/competition/rival/state/referee` (1 Hz) + `/competition/rival/state/live` (20 Hz)
+- **Output**: `/fusion/rival/state` (20 Hz)
+- **Conditional**: Only uses live adapter when in `follow_lock` phase
+- **Parameters**: `process_noise=0.4`, `observation_noise_referee=0.01`, `observation_noise_live=0.1`
+
+### Topic Separation
+
+| Topic | Publisher | Rate |
+|-------|-----------|------|
+| `/competition/rival/state/referee` | competition_client (referee) | 1 Hz |
+| `/competition/rival/state/live` | live_rival_state_adapter (PX4) | 20 Hz |
+| `/fusion/rival/state` | ekf_fusion | 20 Hz |
+
+### Performance Summary
+
+| Configuration | Min Range | Min Cue Error |
+|---------------|-----------|---------------|
+| Baseline (no EKF) | 4.42m | 0.04° |
+| EKF (conditional) | 4.09m | 0.00° |
+| Feed-forward (kff=0.01) | 3.44m | 0.04° |
+
+**Note**: 1m target not yet reached. Controller at practical limit with attitude control.
+
+### Phase 7 Plan
+
+Phase 7 will replace live adapter with real YOLO camera detection:
+- **Detection**: YOLO on `/plane_01/camera/image_raw`
+- **Position estimation**: bbox + camera intrinsics → 3D pose
+- **EKF fusion**: Same architecture, different sensor input
+- **Plan**: `docs/phase-7-plan.md`
+- **Controller report**: `docs/phase6-controller-enhancement-report.md`
+
 ## Agent Command Mapping
 
 Use the right tool for the job:
