@@ -769,7 +769,7 @@ RIVAL_ADAPTER_PID=$!
 
 if [[ "${WITH_OVERLAY}" == "1" ]]; then
   echo "step 11b: starting EKF fusion node for symbology overlay"
-  ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/ekf_fusion --ros-args -p use_sim_time:=true" >"${EKF_FUSION_LOG}" 2>&1 &
+  ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/lib/iconom_competition/ekf_fusion --ros-args -p use_sim_time:=true" >"${EKF_FUSION_LOG}" 2>&1 &
   EKF_FUSION_PID=$!
 fi
 
@@ -795,7 +795,7 @@ wait_for_state pursue 30
 if [[ "${WITH_OVERLAY}" == "1" ]]; then
   echo "step 12c: starting camera symbology overlay node"
   SYMBOLOGY_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-symbology.log"
-  ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/camera_symbology_overlay --ros-args -p use_sim_time:=true" >"${SYMBOLOGY_LOG}" 2>&1 &
+  ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/lib/iconom_vision/camera_symbology_overlay --ros-args -p use_sim_time:=true" >"${SYMBOLOGY_LOG}" 2>&1 &
   SYMBOLOGY_PID=$!
   sleep 2
   if ! kill -0 "${SYMBOLOGY_PID}" 2>/dev/null; then
