@@ -769,7 +769,7 @@ RIVAL_ADAPTER_PID=$!
 
 if [[ "${WITH_OVERLAY}" == "1" ]]; then
   echo "step 11b: starting EKF fusion node for symbology overlay"
-  ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/lib/iconom_competition/ekf_fusion --ros-args -p use_sim_time:=true" >"${EKF_FUSION_LOG}" 2>&1 &
+  ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/ekf_fusion --ros-args -p use_sim_time:=true" >"${EKF_FUSION_LOG}" 2>&1 &
   EKF_FUSION_PID=$!
 fi
 
