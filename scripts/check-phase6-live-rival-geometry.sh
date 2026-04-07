@@ -699,7 +699,7 @@ ros2_exec "
   if [[ ! -d /workspaces/ros2_ws/src/px4_msgs ]]; then
     vcs import /workspaces/ros2_ws/src < /workspaces/ros2_ws/src/px4_msgs.repos
   fi
-  colcon build --merge-install --packages-up-to px4_msgs iconom_control iconom_competition iconom_guidance
+  colcon build --merge-install --packages-up-to px4_msgs iconom_control iconom_competition iconom_guidance iconom_vision
 "
 
 echo "step 6: launching plane_01 and plane_02 PX4 runtimes"
