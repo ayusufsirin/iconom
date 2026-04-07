@@ -115,6 +115,8 @@ class CameraSymbologyOverlay(Node):
             self.get_logger().warn(f"cv_bridge conversion failed: {e}")
             return
 
+        if cv_image is None:
+            return
         overlay = cv_image.copy()
         h, w = overlay.shape[:2]
 
