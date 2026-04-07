@@ -37,6 +37,7 @@ PLANE2_POSITION_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-plane02-positio
 OWNSHIP_ADAPTER_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-ownship.log"
 RIVAL_ADAPTER_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-rival.log"
 EKF_FUSION_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-ekf.log"
+COMPETITION_CLIENT_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-competition-client.log"
 PREDICTOR_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-predictor.log"
 SELECTOR_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-selector.log"
 PLANNER_LOG="${ROOT_DIR}/.tmp-phase6-live-rival-geometry-planner.log"
@@ -58,6 +59,7 @@ MONITOR_PID=""
 RIVAL_ROUTE_PID=""
 SYMBOLOGY_PID=""
 EKF_FUSION_PID=""
+COMPETITION_CLIENT_PID=""
 COLD_BUILD="${ICONOM_PHASE6_COLD_BUILD:-0}"
 WITH_OVERLAY="${ICONOM_PHASE6_WITH_OVERLAY:-0}"
 service=""
@@ -140,6 +142,7 @@ cleanup() {
   stop_pid "${PREDICTOR_PID}"
   stop_pid "${RIVAL_ADAPTER_PID}"
   stop_pid "${OWNSHIP_ADAPTER_PID}"
+  stop_pid "${COMPETITION_CLIENT_PID}"
   stop_pid "${RIVAL_ROUTE_PID}"
   stop_pid "${PX4_PID_2}"
   stop_pid "${PX4_PID_1}"
@@ -754,6 +757,12 @@ ros2_exec "
 " >"${OWNSHIP_ADAPTER_LOG}" 2>&1 &
 OWNSHIP_ADAPTER_PID=$!
 
+if [[ "${WITH_OVERLAY}" == "1" ]]; then
+  echo "step 10b: starting competition client for referee rival state"
+  ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/competition_client --ros-args -p use_sim_time:=true" >"${COMPETITION_CLIENT_LOG}" 2>&1 &
+  COMPETITION_CLIENT_PID=$!
+fi
+
 echo "step 11: starting the live plane_02 rival adapter"
 RIVAL_PUBLISH_RATE_HZ="${RIVAL_PUBLISH_RATE_HZ:-20.0}"
 ros2_exec "
@@ -863,7 +872,8 @@ if [[ -n "${SYMBOLOGY_PID}" ]]; then
 fi
 if [[ -n "${EKF_FUSION_PID}" ]]; then
   stop_pid "${EKF_FUSION_PID}"
-  EKF_FUSION_PID=""
+EKF_FUSION_PID=""
+COMPETITION_CLIENT_PID=""
 fi
 stop_pid "${CUEING_PID}"
 CUEING_PID=""
