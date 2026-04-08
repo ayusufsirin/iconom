@@ -759,7 +759,7 @@ OWNSHIP_ADAPTER_PID=$!
 
 if [[ "${WITH_OVERLAY}" == "1" ]]; then
   echo "step 10b: starting competition client for referee rival state"
-  ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/competition_client --ros-args -p use_sim_time:=true" >"${COMPETITION_CLIENT_LOG}" 2>&1 &
+  ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; export REF_HOST='referee_server'; export REF_PORT='45678'; /workspaces/ros2_ws/install/bin/competition_client --ros-args -p use_sim_time:=true" >"${COMPETITION_CLIENT_LOG}" 2>&1 &
   COMPETITION_CLIENT_PID=$!
 fi
 
