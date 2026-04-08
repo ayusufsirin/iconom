@@ -140,10 +140,10 @@ class EKFFusion(Node):
             self.covariance[i * 7] += q * dt
             self.covariance[(i + 3) * 7] += q * 0.1
 
-    def _update(self, z: list, obs_noise: float) -> None:
+    def _update(self, measurement: list, obs_noise: float) -> None:
         x, y, z = self.state[0], self.state[1], self.state[2]
 
-        y_vec = [z[0] - x, z[1] - y, z[2] - z]
+        y_vec = [measurement[0] - x, measurement[1] - y, measurement[2] - z]
 
         s = [
             self.covariance[0] + obs_noise,
