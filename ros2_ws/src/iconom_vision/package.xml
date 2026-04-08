@@ -2,7 +2,7 @@
 <package format="3">
   <name>iconom_vision</name>
   <version>0.1.0</version>
-  <description>Minimal ROS 2 image subscriber for the iconom camera slice.</description>
+  <description>ROS 2 vision nodes for iconom: camera symbology overlay.</description>
   <maintainer email="devnull@example.com">iconom</maintainer>
   <license>MIT</license>
 
@@ -10,6 +10,8 @@
 
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>cv_bridge</depend>
 
   <export>
     <build_type>ament_python</build_type>
