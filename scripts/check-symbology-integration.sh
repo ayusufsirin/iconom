@@ -237,8 +237,8 @@ main() {
     # Move rival in a loop so it keeps flying in front
     echo "Moving rival through waypoints (looping)..."
     while true; do
-      # Small smooth movements ±2m around 2m front position
-      move_rival "rc_cessna_1" "2,0,10 4,0,10 2,2,10 0,0,10 2,-2,10 4,0,10 2,0,10" 1
+      # Small smooth movements ±2m around 2m front position (1m interpolated steps)
+      move_rival "rc_cessna_1" "2,0,10 3,0,10 4,0,10 3,1,10 2,2,10 1,1,10 0,0,10 1,-1,10 2,-2,10 3,-1,10 4,0,10 3,0,10 2,0,10" 1
       sleep 2
     done
   else
@@ -247,8 +247,8 @@ main() {
     echo "Moving rival through waypoints..."
     # Waypoints bring rival IN FRONT of ownship (X > 0 since camera looks in +X direction)
     # Ownship at (0, 0, 10), rival starts at (2, 0, 10), moves to front then circles
-    # Small smooth movements ±2m around 2m front position
-    move_rival "rc_cessna_1" "2,0,10 4,0,10 2,2,10 0,0,10 2,-2,10 4,0,10 2,0,10" 1
+    # Small smooth movements ±2m around 2m front position (1m interpolated steps)
+    move_rival "rc_cessna_1" "2,0,10 3,0,10 4,0,10 3,1,10 2,2,10 1,1,10 0,0,10 1,-1,10 2,-2,10 3,-1,10 4,0,10 3,0,10 2,0,10" 1
     
     echo "Verifying overlay still active..."
     for i in $(seq 1 15); do
