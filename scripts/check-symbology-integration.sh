@@ -72,9 +72,9 @@ spawn_plane() {
   local model_name="$1"
   local pose="$2"
   
-  # Rival starts 2m in front of ownship (Y=-2, X=0, Z=10)
+  # Rival starts 2m in front of ownship (X=2, camera looks in +X direction)
   if [[ "${model_name}" == "rc_cessna_1" ]]; then
-    pose="0 -2 10 0 0 0"
+    pose="2 0 10 0 0 0"
   fi
 
   echo "Spawning ${model_name} with Cessna model at pose ${pose}"
@@ -238,17 +238,17 @@ main() {
     echo "Moving rival through waypoints (looping)..."
     while true; do
       # Small smooth movements ±2m around 2m front position
-      move_rival "rc_cessna_1" "0,-2,10 0,-4,10 0,-2,8 0,0,10 0,-2,12 0,-4,10 0,-2,10" 1
+      move_rival "rc_cessna_1" "2,0,10 4,0,10 2,2,10 0,0,10 2,-2,10 4,0,10 2,0,10" 1
       sleep 2
     done
   else
     echo ""
     echo "=== Headless Mode ==="
     echo "Moving rival through waypoints..."
-    # Waypoints bring rival IN FRONT of ownship (Y < 0 since camera looks forward)
-    # Ownship at (0, 0, 10), rival starts at (0, -30, 10), moves to front then circles
+    # Waypoints bring rival IN FRONT of ownship (X > 0 since camera looks in +X direction)
+    # Ownship at (0, 0, 10), rival starts at (2, 0, 10), moves to front then circles
     # Small smooth movements ±2m around 2m front position
-    move_rival "rc_cessna_1" "0,-2,10 0,-4,10 0,-2,8 0,0,10 0,-2,12 0,-4,10 0,-2,10" 1
+    move_rival "rc_cessna_1" "2,0,10 4,0,10 2,2,10 0,0,10 2,-2,10 4,0,10 2,0,10" 1
     
     echo "Verifying overlay still active..."
     for i in $(seq 1 15); do
