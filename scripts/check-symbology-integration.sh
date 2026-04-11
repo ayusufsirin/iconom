@@ -72,6 +72,11 @@ spawn_plane() {
   local model_name="$1"
   local pose="$2"
   
+  # Rival starts 2m in front of ownship (Y=-2, X=0, Z=10)
+  if [[ "${model_name}" == "rc_cessna_1" ]]; then
+    pose="0 -2 10 0 0 0"
+  fi
+
   echo "Spawning ${model_name} with Cessna model at pose ${pose}"
   
   docker exec iconom-gazebo-1 bash -lc "
@@ -232,7 +237,8 @@ main() {
     # Move rival in a loop so it keeps flying in front
     echo "Moving rival through waypoints (looping)..."
     while true; do
-      move_rival "rc_cessna_1" "0,-50,10 0,-30,10 0,-15,10 0,-30,10 0,-50,10" 5
+      # Small smooth movements ±2m around 2m front position
+      move_rival "rc_cessna_1" "0,-2,10 0,-4,10 0,-2,8 0,0,10 0,-2,12 0,-4,10 0,-2,10" 1
       sleep 2
     done
   else
@@ -241,7 +247,8 @@ main() {
     echo "Moving rival through waypoints..."
     # Waypoints bring rival IN FRONT of ownship (Y < 0 since camera looks forward)
     # Ownship at (0, 0, 10), rival starts at (0, -30, 10), moves to front then circles
-    move_rival "rc_cessna_1" "0,-50,10 0,-30,10 0,-15,10 0,-30,10 0,-50,10" 5
+    # Small smooth movements ±2m around 2m front position
+    move_rival "rc_cessna_1" "0,-2,10 0,-4,10 0,-2,8 0,0,10 0,-2,12 0,-4,10 0,-2,10" 1
     
     echo "Verifying overlay still active..."
     for i in $(seq 1 15); do
