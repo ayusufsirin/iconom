@@ -17,7 +17,6 @@ echo "  CAMERA_TOPIC=${CAMERA_TOPIC}"
 echo "  CAMERA_INFO_TOPIC=${CAMERA_INFO_TOPIC}"
 
 exec ros2 run ros_gz_bridge parameter_bridge \
-  "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock" \
   "${GZ_IMAGE_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image" \
   "${GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo" \
   --ros-args \

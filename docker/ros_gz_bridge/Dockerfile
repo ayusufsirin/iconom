@@ -35,8 +35,10 @@ WORKDIR /opt/iconom/sim
 COPY sim/ /opt/iconom/sim/
 COPY docker/gazebo/entrypoint.sh /usr/local/bin/gazebo-entrypoint.sh
 COPY docker/ros_gz_bridge/entrypoint.sh /usr/local/bin/ros-gz-bridge-entrypoint.sh
+COPY docker/ros_gz_bridge/pose_bridge_entrypoint.sh /usr/local/bin/pose-bridge-entrypoint.sh
+COPY sim/bridge.yaml /opt/iconom/sim/bridge.yaml
 
-RUN chmod +x /usr/local/bin/gazebo-entrypoint.sh /usr/local/bin/ros-gz-bridge-entrypoint.sh
+RUN chmod +x /usr/local/bin/gazebo-entrypoint.sh /usr/local/bin/ros-gz-bridge-entrypoint.sh /usr/local/bin/pose-bridge-entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/gazebo-entrypoint.sh"]
 CMD ["/usr/local/bin/ros-gz-bridge-entrypoint.sh"]

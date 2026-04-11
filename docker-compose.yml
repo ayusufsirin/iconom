@@ -215,3 +215,19 @@ services:
         condition: service_started
     command: ["/usr/local/bin/ros-gz-bridge-entrypoint.sh"]
     restart: "no"
+
+  ros_gz_bridge_pose:
+    profiles: ["symbology"]
+    build:
+      context: .
+      dockerfile: docker/ros_gz_bridge/Dockerfile
+    network_mode: "service:gazebo"
+    environment:
+      ROS_DISTRO: ${ROS_DISTRO:-humble}
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      USE_SIM_TIME: ${USE_SIM_TIME:-true}
+    depends_on:
+      gazebo:
+        condition: service_started
+    command: ["/usr/local/bin/pose-bridge-entrypoint.sh"]
+    restart: "no"

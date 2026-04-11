@@ -133,7 +133,7 @@ start_services() {
   docker compose "${profile_args[@]}" up -d ros2_app
   
   echo "Starting ros_gz_bridge..."
-  docker compose "${profile_args[@]}" up -d ros_gz_bridge ros_gz_bridge_plane_02
+  docker compose "${profile_args[@]}" up -d ros_gz_bridge ros_gz_bridge_plane_02 ros_gz_bridge_pose
   
   sleep 5
   echo "Services started"
