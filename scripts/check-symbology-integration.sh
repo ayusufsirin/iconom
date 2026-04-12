@@ -135,8 +135,19 @@ start_services() {
   echo "Starting ros_gz_bridge..."
   docker compose "${profile_args[@]}" up -d ros_gz_bridge ros_gz_bridge_plane_02 ros_gz_bridge_pose
   
+  echo "Starting web services (rosbridge + camera_web)..."
+  docker compose "${profile_args[@]}" up -d rosbridge camera_web
+  
   sleep 5
   echo "Services started"
+  echo ""
+  echo "=== Web Access ==="
+  echo "View camera overlay in browser:"
+  echo "  http://localhost:8766/docs/phase6-camera-viewer.html"
+  echo ""
+  echo "In the viewer:"
+  echo "  Topic: /plane_01/camera/image_overlay"
+  echo "  Click: Connect"
 }
 
 wait_for_camera_topics() {
