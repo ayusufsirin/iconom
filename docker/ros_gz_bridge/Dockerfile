@@ -18,10 +18,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     | gpg --dearmor -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(. /etc/os-release && echo ${UBUNTU_CODENAME}) main" \
     > /etc/apt/sources.list.d/gazebo-stable.list \
- && apt-get update && apt-get install -y --no-install-recommends \
-    ros-humble-ros-base \
-    ros-humble-ros-gzharmonic \
- && rm -rf /var/lib/apt/lists/*
+  && apt-get update && apt-get install -y --no-install-recommends \
+     ros-humble-ros-base \
+     ros-humble-ros-gzharmonic \
+     gz-tools2 \
+     gz-transport12-cli \
+  && rm -rf /var/lib/apt/lists/*
 
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
@@ -36,9 +38,10 @@ COPY sim/ /opt/iconom/sim/
 COPY docker/gazebo/entrypoint.sh /usr/local/bin/gazebo-entrypoint.sh
 COPY docker/ros_gz_bridge/entrypoint.sh /usr/local/bin/ros-gz-bridge-entrypoint.sh
 COPY docker/ros_gz_bridge/pose_bridge_entrypoint.sh /usr/local/bin/pose-bridge-entrypoint.sh
+COPY docker/ros_gz_bridge/pose_bridge.py /usr/local/bin/pose_bridge.py
 COPY sim/bridge.yaml /opt/iconom/sim/bridge.yaml
 
-RUN chmod +x /usr/local/bin/gazebo-entrypoint.sh /usr/local/bin/ros-gz-bridge-entrypoint.sh /usr/local/bin/pose-bridge-entrypoint.sh
+RUN chmod +x /usr/local/bin/gazebo-entrypoint.sh /usr/local/bin/ros-gz-bridge-entrypoint.sh /usr/local/bin/pose-bridge-entrypoint.sh /usr/local/bin/pose_bridge.py
 
 ENTRYPOINT ["/usr/local/bin/gazebo-entrypoint.sh"]
 CMD ["/usr/local/bin/ros-gz-bridge-entrypoint.sh"]

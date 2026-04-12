@@ -1,0 +1,19 @@
+- gz_topic_name: "/clock"
+  ros_topic_name: "/clock"
+  msg_type: "rosgraph_msgs/msg/Clock"
+
+- gz_topic_name: "/world/default/model/rc_cessna_0/link/camera_link/sensor/imager/image"
+  ros_topic_name: "/plane_01/camera/image_raw"
+  msg_type: "sensor_msgs/msg/Image"
+
+- gz_topic_name: "/world/default/model/rc_cessna_0/link/camera_link/sensor/imager/camera_info"
+  ros_topic_name: "/plane_01/camera/camera_info"
+  msg_type: "sensor_msgs/msg/CameraInfo"
+
+- gz_topic_name: "/world/default/model/rc_cessna_0/pose"
+  ros_topic_name: "/competition/ownship/state"
+  msg_type: "geometry_msgs/msg/PoseStamped"
+
+- gz_topic_name: "/world/default/model/rc_cessna_1/pose"
+  ros_topic_name: "/fusion/rival/state"
+  msg_type: "geometry_msgs/msg/PoseStamped"

@@ -79,17 +79,18 @@ spawn_plane() {
 
   echo "Spawning ${model_name} with Cessna model at pose ${pose}"
   
-  docker exec iconom-gazebo-1 bash -lc "
-    # Create SDF with renamed model, pose, and static=1 (using | as sed delimiter)
-    sed -e \"s|<model name='rc_cessna'>|<model name='${model_name}'>|g\" \
-        -e \"s|<pose>0 0 0.246 0 0 0</pose>|<pose>${pose}</pose>|g\" \
-        -e \"s|<static>0</static>|<static>1</static>|g\" \
+  docker exec iconom-gazebo-1 bash -lc '
+    # Create SDF with renamed model, pose, and static=1
+    sed -e "s|<model name='"'"'rc_cessna'"'"'>|<model name='"'"'${model_name}'"'"'>|g" \
+        -e "s|<pose>0 0 0.246 0 0 0</pose>|<pose>${pose}</pose>|g" \
+        -e "s|<static>0</static>|<static>1</static>|g" \
       /opt/iconom/sim/models/rc_cessna/model.sdf \
       > /tmp/${model_name}.sdf
-    
-    # Spawn model (pose is embedded in SDF)
-    gz service -s /world/default/create --reqtype gz.msgs.EntityFactory --reptype gz.msgs.Boolean -r \"sdf_filename: \\\"/tmp/${model_name}.sdf\\\"\"
-  "
+  '
+  # Spawn using gz service (gz model -f is not available in all gz versions)
+  docker exec iconom-gazebo-1 gz service -s /world/default/create \
+    -r "sdf_filename: \"/tmp/${model_name}.sdf\", allow_renaming: true" \
+    --reqtype gz.msgs.EntityFactory --reptype gz.msgs.Boolean > /dev/null 2>&1
   sleep 1
   echo "${model_name} spawned"
 }
