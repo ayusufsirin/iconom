@@ -134,12 +134,10 @@ def validate_crosshair(frame: Any, expect: str, min_line_pixels: int) -> CheckRe
 
 def run(topic: str, expect: str, timeout_s: float, min_red_overlap: float, min_line_pixels: int) -> int:
     rclpy = importlib.import_module("rclpy")
-    cv_bridge_mod = importlib.import_module("cv_bridge")
     executors_mod = importlib.import_module("rclpy.executors")
     node_mod = importlib.import_module("rclpy.node")
     sensor_msgs_mod = importlib.import_module("sensor_msgs.msg")
 
-    CvBridge = cv_bridge_mod.CvBridge
     SingleThreadedExecutor = executors_mod.SingleThreadedExecutor
     Node = node_mod.Node
     Image = sensor_msgs_mod.Image
@@ -147,13 +145,16 @@ def run(topic: str, expect: str, timeout_s: float, min_red_overlap: float, min_l
     class OverlayFrameCollector(Node):
         def __init__(self, topic_name: str) -> None:
             super().__init__("overlay_frame_validator")
-            self._bridge = CvBridge()
             self._frame = None
             self._frame_count = 0
             self.create_subscription(Image, topic_name, self._on_image, 10)
 
         def _on_image(self, msg: Any) -> None:
-            self._frame = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            if msg.encoding == "bgr8":
+                self._frame = np.frombuffer(msg.data, dtype=np.uint8).reshape((msg.height, msg.width, 3))
+            else:
+                buffer = np.frombuffer(msg.data, dtype=np.uint8)
+                self._frame = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
             self._frame_count += 1
 
         @property
