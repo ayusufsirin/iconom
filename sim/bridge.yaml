@@ -9,11 +9,3 @@
 - gz_topic_name: "/world/default/model/rc_cessna_0/link/camera_link/sensor/imager/camera_info"
   ros_topic_name: "/plane_01/camera/camera_info"
   msg_type: "sensor_msgs/msg/CameraInfo"
-
-- gz_topic_name: "/world/default/model/rc_cessna_0/pose"
-  ros_topic_name: "/competition/ownship/state"
-  msg_type: "geometry_msgs/msg/PoseStamped"
-
-- gz_topic_name: "/world/default/model/rc_cessna_1/pose"
-  ros_topic_name: "/fusion/rival/state"
-  msg_type: "geometry_msgs/msg/PoseStamped"
