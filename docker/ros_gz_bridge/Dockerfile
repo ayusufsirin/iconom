@@ -19,11 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(. /etc/os-release && echo ${UBUNTU_CODENAME}) main" \
     > /etc/apt/sources.list.d/gazebo-stable.list \
   && apt-get update && apt-get install -y --no-install-recommends \
-     ros-humble-ros-base \
-     ros-humble-ros-gzharmonic \
-     gz-tools2 \
-     gz-transport12-cli \
-  && rm -rf /var/lib/apt/lists/*
+      ros-humble-ros-base \
+      ros-humble-ros-gzharmonic \
+      gz-tools2 \
+      gz-transport12-cli \
+      python3-gz-transport13 \
+   && rm -rf /var/lib/apt/lists/*
 
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
