@@ -192,6 +192,99 @@ verify_topic_data() {
   return 1
 }
 
+get_topic_info() {
+  local topic="$1"
+  local ros2_app="iconom-ros2_app-1"
+  docker exec "${ros2_app}" bash -lc \
+    'source /opt/ros/humble/setup.bash 2>/dev/null; ros2 topic info '"${topic}"' 2>/dev/null' || true
+}
+
+topic_has_type() {
+  local topic="$1"
+  local expected_type="$2"
+  local info
+
+  info="$(get_topic_info "${topic}")"
+  [[ -n "${info}" ]] && echo "${info}" | grep -Eq "^Type: ${expected_type}$"
+}
+
+topic_has_publisher_count() {
+  local topic="$1"
+  local expected_count="$2"
+  local info
+
+  info="$(get_topic_info "${topic}")"
+  [[ -n "${info}" ]] && echo "${info}" | grep -Eq "^Publisher count: ${expected_count}$"
+}
+
+topic_has_pose_sample() {
+  local topic="$1"
+  local ros2_app="iconom-ros2_app-1"
+  local sample
+
+  sample=$(docker exec "${ros2_app}" bash -lc \
+    'source /opt/ros/humble/setup.bash 2>/dev/null; timeout 5 ros2 topic echo --once '"${topic}"' 2>/dev/null' || true)
+
+  [[ -n "${sample}" ]] && echo "${sample}" | grep -Eq 'header:|pose:'
+}
+
+topic_has_nonzero_rate() {
+  local topic="$1"
+  local ros2_app="iconom-ros2_app-1"
+  local hz_output
+  local rate
+
+  hz_output=$(docker exec "${ros2_app}" bash -lc \
+    'source /opt/ros/humble/setup.bash 2>/dev/null; timeout 6 ros2 topic hz '"${topic}"' 2>/dev/null' || true)
+  rate=$(echo "${hz_output}" | awk '/average rate:/ {print $3; exit}')
+
+  if [[ -z "${rate}" || "${rate}" == "0" || "${rate}" == "0.0" || "${rate}" == "nan" ]]; then
+    return 1
+  fi
+
+  awk -v r="${rate}" 'BEGIN {exit !(r+0>0)}'
+}
+
+wait_for_pose_check() {
+  local description="$1"
+  local timeout="$2"
+  shift 2
+
+  local start_time=${SECONDS}
+
+  echo "Pose readiness check: ${description}"
+  while (( SECONDS - start_time < timeout )); do
+    if "$@"; then
+      echo "  PASS: ${description}"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "ERROR: Pose readiness check failed after ${timeout}s: ${description}" >&2
+  return 1
+}
+
+wait_for_pose_topics() {
+  local timeout="${1:-30}"
+  local expected_type="geometry_msgs/msg/PoseStamped"
+  local ownship_topic="/competition/ownship/state"
+  local rival_topic="/fusion/rival/state"
+
+  echo "Waiting for pose topic readiness gate..."
+
+  wait_for_pose_check "${ownship_topic} type is ${expected_type}" "${timeout}" topic_has_type "${ownship_topic}" "${expected_type}" || return 1
+  wait_for_pose_check "${ownship_topic} publisher count is exactly 1" "${timeout}" topic_has_publisher_count "${ownship_topic}" "1" || return 1
+  wait_for_pose_check "${rival_topic} type is ${expected_type}" "${timeout}" topic_has_type "${rival_topic}" "${expected_type}" || return 1
+  wait_for_pose_check "${rival_topic} publisher count is exactly 1" "${timeout}" topic_has_publisher_count "${rival_topic}" "1" || return 1
+  wait_for_pose_check "${ownship_topic} publishes a PoseStamped sample" "${timeout}" topic_has_pose_sample "${ownship_topic}" || return 1
+  wait_for_pose_check "${rival_topic} publishes a PoseStamped sample" "${timeout}" topic_has_pose_sample "${rival_topic}" || return 1
+  wait_for_pose_check "${ownship_topic} publish rate is non-zero" "${timeout}" topic_has_nonzero_rate "${ownship_topic}" || return 1
+  wait_for_pose_check "${rival_topic} publish rate is non-zero" "${timeout}" topic_has_nonzero_rate "${rival_topic}" || return 1
+
+  echo "Pose topic readiness gate passed"
+}
+
 start_symbology_overlay() {
   local ros2_app="iconom-ros2_app-1"
   
@@ -213,9 +306,11 @@ main() {
   echo "Spawning planes..."
   spawn_plane "rc_cessna_0" "0 0 10 0 0 0"
   spawn_plane "rc_cessna_1" "0 15 10 0 0 0"
+
+  wait_for_pose_topics 30
   
-  wait_for_camera_topics 45 || echo "Continuing despite camera issues..."
-  verify_topic_data 20 || echo "Continuing despite data issues..."
+  wait_for_camera_topics 45
+  verify_topic_data 20
   
   start_symbology_overlay
   
