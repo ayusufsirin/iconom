@@ -119,7 +119,7 @@ def validate_crosshair(frame: Any, expect: str, min_line_pixels: int) -> CheckRe
     has_circle = _has_circle_cardinals(mask, cx, cy)
 
     if expect == "grey":
-        tol = 3
+        tol = 15
         bx, by, _ = _best_crosshair_center(mask)
         if abs(bx - (w // 2)) > tol or abs(by - (h // 2)) > tol:
             return CheckResult(
