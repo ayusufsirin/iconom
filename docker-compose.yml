@@ -138,6 +138,7 @@ services:
     working_dir: /workspaces/ros2_ws
     volumes:
       - ./ros2_ws:/workspaces/ros2_ws
+      - ./scripts:/workspaces/scripts
     command: ["bash", "-lc", "echo 'ros2_app base workspace ready; no project packages are implemented yet'; sleep infinity"]
     restart: "no"
 

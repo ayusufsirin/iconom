@@ -259,7 +259,7 @@ capture_overlay_frame() {
       source /workspaces/ros2_ws/install/setup.bash >/dev/null 2>&1
     fi
     set -u
-    timeout '"${timeout_seconds}"' python3 /workspaces/iconom/scripts/validate-overlay-frame.py \
+    timeout '"${timeout_seconds}"' python3 /workspaces/scripts/validate-overlay-frame.py \
       --topic '"${overlay_topic}"' \
       --expect '"${expect_crosshair}"' \
       --timeout '"${timeout_seconds}"'
