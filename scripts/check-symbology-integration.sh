@@ -245,6 +245,32 @@ topic_has_nonzero_rate() {
   awk -v r="${rate}" 'BEGIN {exit !(r+0>0)}'
 }
 
+capture_overlay_frame() {
+  local expect_crosshair="$1"
+  local timeout_seconds="${2:-12}"
+  local ros2_app="iconom-ros2_app-1"
+  local overlay_topic="/plane_01/camera/image_overlay"
+
+  echo "Validating overlay frame (expect=${expect_crosshair}, timeout=${timeout_seconds}s)..."
+  if ! docker exec "${ros2_app}" bash -lc '
+    set +u
+    source /opt/ros/humble/setup.bash >/dev/null 2>&1
+    if [[ -f /workspaces/ros2_ws/install/setup.bash ]]; then
+      source /workspaces/ros2_ws/install/setup.bash >/dev/null 2>&1
+    fi
+    set -u
+    timeout '"${timeout_seconds}"' python3 /workspaces/iconom/scripts/validate-overlay-frame.py \
+      --topic '"${overlay_topic}"' \
+      --expect '"${expect_crosshair}"' \
+      --timeout '"${timeout_seconds}"'
+  '; then
+    echo "ERROR: overlay frame validation failed for expect=${expect_crosshair}" >&2
+    return 1
+  fi
+
+  echo "Overlay frame validation passed for expect=${expect_crosshair}"
+}
+
 wait_for_pose_check() {
   local description="$1"
   local timeout="$2"
@@ -328,6 +354,15 @@ main() {
   done
   
   if [[ "${GUI_MODE}" == "true" ]]; then
+    echo "Running deterministic overlay validation before GUI loop..."
+    move_rival "rc_cessna_1" "2,0,10 3,0,10 2,0,10" 1
+    wait_for_pose_topics 20
+    capture_overlay_frame "green" 15
+
+    move_rival "rc_cessna_1" "0,15,10 -2,15,10" 1
+    wait_for_pose_topics 20
+    capture_overlay_frame "grey" 15
+
     echo ""
     echo "=== GUI Mode Ready ==="
     echo "Gazebo window should be visible with Cessna planes."
@@ -352,22 +387,16 @@ main() {
   else
     echo ""
     echo "=== Headless Mode ==="
-    echo "Moving rival through waypoints..."
-    # Waypoints bring rival IN FRONT of ownship (X > 0 since camera looks in +X direction)
-    # Ownship at (0, 0, 10), rival starts at (2, 0, 10), moves to front then circles
-    # Small smooth movements ±2m around 2m front position (1m interpolated steps)
-    move_rival "rc_cessna_1" "2,0,10 3,0,10 4,0,10 3,1,10 2,2,10 1,1,10 0,0,10 1,-1,10 2,-2,10 3,-1,10 4,0,10 3,0,10 2,0,10" 1
-    
-    echo "Verifying overlay still active..."
-    for i in $(seq 1 15); do
-      TOPICS=$(docker exec "${ros2_app}" bash -lc 'source /opt/ros/humble/setup.bash 2>/dev/null; ros2 topic list 2>/dev/null' || echo "")
-      if echo "${TOPICS}" | grep -q "${overlay_topic}"; then
-        echo "Overlay still active"
-        break
-      fi
-      sleep 1
-    done
-    
+    echo "Checkpoint 1: rival in front, expect green crosshair"
+    move_rival "rc_cessna_1" "2,0,10 3,0,10 4,0,10 3,0,10 2,0,10" 1
+    wait_for_pose_topics 20
+    capture_overlay_frame "green" 15
+
+    echo "Checkpoint 2: rival out of camera cone, expect grey center crosshair"
+    move_rival "rc_cessna_1" "0,15,10 -2,15,10" 1
+    wait_for_pose_topics 20
+    capture_overlay_frame "grey" 15
+
     echo ""
     echo "=== SYMBOLOGY INTEGRATION TEST PASSED ==="
   fi
