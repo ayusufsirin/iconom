@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
+# pyright: reportMissingImports=false
 """Validate deterministic symbology primitives on overlay frames."""
 
 from __future__ import annotations
 
 import argparse
-import importlib
 import sys
 import time
 from dataclasses import dataclass
@@ -12,6 +12,11 @@ from typing import Any
 
 import cv2
 import numpy as np
+import rclpy
+from rclpy.executors import SingleThreadedExecutor
+from rclpy.exceptions import RCLError
+from rclpy.node import Node
+from sensor_msgs.msg import Image
 
 
 @dataclass
@@ -133,15 +138,6 @@ def validate_crosshair(frame: Any, expect: str, min_line_pixels: int) -> CheckRe
 
 
 def run(topic: str, expect: str, timeout_s: float, min_red_overlap: float, min_line_pixels: int) -> int:
-    rclpy = importlib.import_module("rclpy")
-    executors_mod = importlib.import_module("rclpy.executors")
-    node_mod = importlib.import_module("rclpy.node")
-    sensor_msgs_mod = importlib.import_module("sensor_msgs.msg")
-
-    SingleThreadedExecutor = executors_mod.SingleThreadedExecutor
-    Node = node_mod.Node
-    Image = sensor_msgs_mod.Image
-
     class OverlayFrameCollector(Node):
         def __init__(self, topic_name: str) -> None:
             super().__init__("overlay_frame_validator")
@@ -165,7 +161,8 @@ def run(topic: str, expect: str, timeout_s: float, min_red_overlap: float, min_l
         def frame_count(self) -> int:
             return self._frame_count
 
-    rclpy.init()
+    if not rclpy.ok():
+        rclpy.init()
     node = OverlayFrameCollector(topic)
     executor = SingleThreadedExecutor()
     executor.add_node(node)
@@ -201,7 +198,10 @@ def run(topic: str, expect: str, timeout_s: float, min_red_overlap: float, min_l
     finally:
         executor.remove_node(node)
         node.destroy_node()
-        rclpy.shutdown()
+        try:
+            rclpy.shutdown()
+        except RCLError:
+            pass
 
 
 def parse_args() -> argparse.Namespace:
