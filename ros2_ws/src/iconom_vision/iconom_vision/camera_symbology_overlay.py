@@ -131,36 +131,42 @@ class CameraSymbologyOverlay(Node):
                 self.get_logger().warn(f"no marker: missing {', '.join(missing)}")
         else:
             projected = self._project_3d_to_2d(self.rival_pose, self.ownship_pose)
-            if projected is None:
+            is_visible = projected is not None and 0 <= projected[0] <= w and 0 <= projected[1] <= h
+            if is_visible:
+                u, v = projected
                 self._log_counter += 1
                 if self._log_counter % self._log_interval == 0:
-                    if self.camera_info_msg is None:
-                        self.get_logger().warn("no marker: no camera_info")
-                    else:
-                        dx = self.rival_pose.pose.position.x - self.ownship_pose.pose.position.x
-                        dy = self.rival_pose.pose.position.y - self.ownship_pose.pose.position.y
-                        dz = self.rival_pose.pose.position.z - self.ownship_pose.pose.position.z
-                        self.get_logger().warn(
-                            f"no marker: projection failed (dz={dz:.2f} <= 0.1, rival behind or too close)"
-                        )
+                    self.get_logger().info(
+                        f"rival visible at ({int(u)}, {int(v)}) - "
+                        f"rival delta: ({self.rival_pose.pose.position.x - self.ownship_pose.pose.position.x:.1f}, "
+                        f"{self.rival_pose.pose.position.y - self.ownship_pose.pose.position.y:.1f}, "
+                        f"{self.rival_pose.pose.position.z - self.ownship_pose.pose.position.z:.1f})"
+                    )
+            elif projected is None:
+                self._log_counter += 1
+                if self._log_counter % self._log_interval == 0:
+                    dx = self.rival_pose.pose.position.x - self.ownship_pose.pose.position.x
+                    dy = self.rival_pose.pose.position.y - self.ownship_pose.pose.position.y
+                    dz = self.rival_pose.pose.position.z - self.ownship_pose.pose.position.z
+                    self.get_logger().warn(
+                        f"rival not visible: projection failed (dz={dz:.2f} <= 0.1, rival behind or too close)"
+                    )
             else:
                 u, v = projected
-                if 0 <= u <= w and 0 <= v <= h:
-                    self._draw_rival_marker(overlay, int(u), int(v))
-                    self._log_counter += 1
-                    if self._log_counter % self._log_interval == 0:
-                        self.get_logger().info(
-                            f"drawing marker at ({int(u)}, {int(v)}) - "
-                            f"rival delta: ({self.rival_pose.pose.position.x - self.ownship_pose.pose.position.x:.1f}, "
-                            f"{self.rival_pose.pose.position.y - self.ownship_pose.pose.position.y:.1f}, "
-                            f"{self.rival_pose.pose.position.z - self.ownship_pose.pose.position.z:.1f})"
-                        )
-                else:
-                    self._log_counter += 1
-                    if self._log_counter % self._log_interval == 0:
-                        self.get_logger().warn(
-                            f"no marker: projected ({u:.0f}, {v:.0f}) outside image bounds (0-{w}, 0-{h})"
-                        )
+                self._log_counter += 1
+                if self._log_counter % self._log_interval == 0:
+                    self.get_logger().warn(
+                        f"rival not visible: projected ({u:.0f}, {v:.0f}) outside image bounds (0-{w}, 0-{h})"
+                    )
+
+        self._draw_static_box(overlay, w, h)
+
+        # Draw crosshair symbology
+        if self.rival_pose is not None and self.ownship_pose is not None:
+            if is_visible:
+                self._draw_crosshair(overlay, int(u), int(v), w, h, is_visible=True)
+            else:
+                self._draw_crosshair(overlay, w // 2, h // 2, w, h, is_visible=False)
 
         try:
             overlay_msg = self.bridge.cv2_to_imgmsg(overlay, encoding="bgr8")
@@ -170,23 +176,28 @@ class CameraSymbologyOverlay(Node):
         except Exception as e:
             self.get_logger().warn(f"failed to publish overlay: {e}")
 
-    def _draw_rival_marker(self, overlay: np.ndarray, u: int, v: int) -> None:
-        color = (0, 255, 0)
+    def _draw_static_box(self, overlay: np.ndarray, w: int, h: int) -> None:
+        box_w, box_h = 100, 80
+        top_left = ((w - box_w) // 2, (h - box_h) // 2)
+        bottom_right = (top_left[0] + box_w, top_left[1] + box_h)
+        cv2.rectangle(overlay, top_left, bottom_right, (0, 0, 255), 2)
+
+    def _draw_crosshair(
+        self,
+        overlay: np.ndarray,
+        u: int,
+        v: int,
+        w: int,
+        h: int,
+        is_visible: bool,
+    ) -> None:
+        color = (0, 255, 0) if is_visible else (128, 128, 128)
         thickness = 2
         radius = 20
 
         cv2.circle(overlay, (u, v), radius, color, thickness)
         cv2.line(overlay, (u - 30, v), (u + 30, v), color, thickness)
         cv2.line(overlay, (u, v - 30), (u, v + 30), color, thickness)
-        cv2.putText(
-            overlay,
-            "RIVAL",
-            (u + 25, v - 25),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            color,
-            2,
-        )
 
 
 def main() -> int:
