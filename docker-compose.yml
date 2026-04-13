@@ -185,6 +185,9 @@ services:
     environment:
       ROS_DISTRO: ${ROS_DISTRO:-humble}
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      OWNSHIP_MODEL: ${OWNSHIP_MODEL:-rc_cessna_0}
+      RIVAL_MODEL: ${RIVAL_MODEL:-rc_cessna_1}
+      POLL_RATE: ${POLL_RATE:-10.0}
       USE_SIM_TIME: ${USE_SIM_TIME:-true}
       GZ_IMAGE_TOPIC: ${GZ_IMAGE_TOPIC:-/world/default/model/rc_cessna_0/link/camera_link/sensor/imager/image}
       GZ_CAMERA_INFO_TOPIC: ${GZ_CAMERA_INFO_TOPIC:-/world/default/model/rc_cessna_0/link/camera_link/sensor/imager/camera_info}
@@ -225,6 +228,9 @@ services:
     environment:
       ROS_DISTRO: ${ROS_DISTRO:-humble}
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      OWNSHIP_MODEL: ${OWNSHIP_MODEL:-rc_cessna_0}
+      RIVAL_MODEL: ${RIVAL_MODEL:-rc_cessna_1}
+      POLL_RATE: ${POLL_RATE:-10.0}
       USE_SIM_TIME: ${USE_SIM_TIME:-true}
     depends_on:
       gazebo:
