@@ -91,16 +91,15 @@ class CameraSymbologyOverlay(Node):
 
         fx, fy, cx, cy = k[0], k[4], k[2], k[5]
 
-        # World-frame subtraction (no TF needed per requirements)
-        dx = rival_pose.pose.position.x - ownship_pose.pose.position.x
-        dy = rival_pose.pose.position.y - ownship_pose.pose.position.y
-        dz = rival_pose.pose.position.z - ownship_pose.pose.position.z
+        depth = rival_pose.pose.position.x - ownship_pose.pose.position.x
+        lateral = rival_pose.pose.position.y - ownship_pose.pose.position.y
+        vertical = rival_pose.pose.position.z - ownship_pose.pose.position.z
 
-        if dz <= 0.1:
+        if depth <= 0.1:
             return None
 
-        u = fx * dx / dz + cx
-        v = fy * dy / dz + cy
+        u = fx * lateral / depth + cx
+        v = fy * vertical / depth + cy
 
         return (u, v)
 
@@ -145,11 +144,9 @@ class CameraSymbologyOverlay(Node):
             elif projected is None:
                 self._log_counter += 1
                 if self._log_counter % self._log_interval == 0:
-                    dx = self.rival_pose.pose.position.x - self.ownship_pose.pose.position.x
-                    dy = self.rival_pose.pose.position.y - self.ownship_pose.pose.position.y
-                    dz = self.rival_pose.pose.position.z - self.ownship_pose.pose.position.z
+                    depth = self.rival_pose.pose.position.x - self.ownship_pose.pose.position.x
                     self.get_logger().warn(
-                        f"rival not visible: projection failed (dz={dz:.2f} <= 0.1, rival behind or too close)"
+                        f"rival not visible: projection failed (depth={depth:.2f} <= 0.1, rival behind or too close)"
                     )
             else:
                 u, v = projected

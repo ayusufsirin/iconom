@@ -318,7 +318,7 @@ start_symbology_overlay() {
   docker exec "${ros2_app}" bash -lc '
     source /opt/ros/humble/setup.bash
     cd /workspaces/ros2_ws
-    colcon build --packages-select iconom_vision 2>&1 || true
+    colcon build --merge-install --packages-select iconom_vision
     source install/setup.bash
     ros2 run iconom_vision camera_symbology_overlay &
   ' > /tmp/symbology.log 2>&1 &

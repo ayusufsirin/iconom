@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --no-cache-dir requests
-RUN pip3 install --no-cache-dir opencv-python-headless
+RUN pip3 install --no-cache-dir "numpy<2" "opencv-python-headless<4.10"
 
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
