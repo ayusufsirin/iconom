@@ -14,7 +14,6 @@ import cv2
 import numpy as np
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
-from rclpy.exceptions import RCLError
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 
@@ -200,7 +199,7 @@ def run(topic: str, expect: str, timeout_s: float, min_red_overlap: float, min_l
         node.destroy_node()
         try:
             rclpy.shutdown()
-        except RCLError:
+        except RuntimeError:
             pass
 
 
