@@ -13,6 +13,7 @@ from typing import Any
 import cv2
 import numpy as np
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -171,7 +172,12 @@ def run(topic: str, expect: str, timeout_s: float, min_red_overlap: float, min_l
 
     try:
         while time.monotonic() < deadline:
-            executor.spin_once(timeout_sec=0.25)
+            if not rclpy.ok():
+                break
+            try:
+                executor.spin_once(timeout_sec=0.25)
+            except ExternalShutdownException:
+                break
             if node.frame is None or node.frame_count == analyzed_count:
                 continue
 
@@ -199,7 +205,7 @@ def run(topic: str, expect: str, timeout_s: float, min_red_overlap: float, min_l
         node.destroy_node()
         try:
             rclpy.shutdown()
-        except RuntimeError:
+        except (RuntimeError, ExternalShutdownException):
             pass
 
 
