@@ -32,7 +32,7 @@ capture_evidence() {
   docker exec "${ROS2_APP}" bash -lc 'cat /tmp/aircraft_detector.log' > "${evidence_dir}/task-2-detector.log" 2>/dev/null || true
 
   docker exec "${ROS2_APP}" bash -lc 'python3 -c "import numpy; print(numpy.__version__)"' > "${evidence_dir}/task-2-numpy-version.txt" 2>/dev/null || true
-  docker exec "${ROS2_APP}" bash -lc 'python3 -c "import cv_bridge; print(cv_bridge.__version__ if hasattr(cv_bridge, \"__version__\") else \"ok\")"' > "${evidence_dir}/task-2-cv-bridge-version.txt" 2>/dev/null || true
+  docker exec "${ROS2_APP}" bash -lc 'source /opt/ros/humble/setup.bash >/dev/null 2>&1; python3 -c "import cv_bridge; print(cv_bridge.__version__ if hasattr(cv_bridge, \"__version__\") else \"ok\")"' > "${evidence_dir}/task-2-cv-bridge-version.txt" 2>/dev/null || true
   docker exec "${ROS2_APP}" bash -lc 'python3 -c "import ultralytics; print(ultralytics.__version__)"' > "${evidence_dir}/task-2-ultralytics-version.txt" 2>/dev/null || true
   docker exec "${ROS2_APP}" bash -lc 'python3 -c "from ultralytics import YOLO; YOLO(\"/workspaces/yolov8n.pt\"); print(\"model load ok\")"' > "${evidence_dir}/task-2-yolo-load.txt" 2>/dev/null || true
 
@@ -58,8 +58,8 @@ preflight_checks() {
     fail "PREFLIGHT FAILED: NumPy major version is not 1 (found: ${numpy_major})"
   fi
 
-  if ! docker exec "${ROS2_APP}" bash -lc 'python3 -c "import cv_bridge; print(\"cv_bridge ok\")"' >/dev/null 2>&1; then
-    fail "PREFLIGHT FAILED: cv_bridge not importable"
+  if ! docker exec "${ROS2_APP}" bash -lc 'source /opt/ros/humble/setup.bash >/dev/null 2>&1; python3 -c "import cv_bridge; print(\"cv_bridge ok\")"' >/dev/null 2>&1; then
+    fail "PREFLIGHT FAILED: cv_bridge not importable (check ROS environment)"
   fi
   log "Preflight: cv_bridge import OK"
 
