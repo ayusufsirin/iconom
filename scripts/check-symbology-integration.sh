@@ -100,16 +100,91 @@ move_rival() {
   local model_name="${1:-rc_cessna_1}"
   local waypoints="$2"
   local dwell="${3:-2}"
-  
+
+  local DT="0.10"
+
+  if awk -v d="${dwell}" 'BEGIN { exit !(d <= 0) }'; then
+    echo "ERROR: move_rival dwell must be > 0 (got ${dwell})" >&2
+    exit 1
+  fi
+
   echo "Moving ${model_name} through waypoints: ${waypoints}"
   IFS=' ' read -ra WPS <<< "${waypoints}"
-  for wp in "${WPS[@]}"; do
-    echo "  -> ${wp}"
-    docker exec iconom-gazebo-1 bash -lc "
-      IFS=',' read -r x y z r p yaw <<< '${wp}'
-      gz service -s /world/default/set_pose --reqtype gz.msgs.Pose --reptype gz.msgs.Boolean -r \"name: \\\"${model_name}\\\" position: {x: \${x}, y: \${y}, z: \${z}}\"
-    " 2>/dev/null || true
-    sleep "${dwell}"
+
+  if (( ${#WPS[@]} < 2 )); then
+    echo "move_rival: need at least two waypoints, got ${#WPS[@]}"
+    return 0
+  fi
+
+  for ((i=1; i<${#WPS[@]}; i++)); do
+    local start_wp="${WPS[$((i-1))]}"
+    local end_wp="${WPS[$i]}"
+    local sx sy sz sr sp syaw
+    local ex ey ez er ep eyaw
+    IFS=',' read -r sx sy sz sr sp syaw <<< "${start_wp}"
+    IFS=',' read -r ex ey ez er ep eyaw <<< "${end_wp}"
+
+    local dist
+    dist=$(awk -v sx="${sx}" -v sy="${sy}" -v sz="${sz}" -v ex="${ex}" -v ey="${ey}" -v ez="${ez}" 'BEGIN { dx=ex-sx; dy=ey-sy; dz=ez-sz; printf "%.10f", sqrt(dx*dx + dy*dy + dz*dz) }')
+
+    if awk -v d="${dist}" 'BEGIN { exit !(d < 0.001) }'; then
+      echo "interp: seg=${i} SKIPPED (zero-length)"
+      continue
+    fi
+
+    local speed
+    speed=$(awk -v d="${dist}" -v w="${dwell}" 'BEGIN { printf "%.10f", d / w }')
+
+    local steps
+    steps=$(awk -v d="${dist}" -v s="${speed}" -v dt="${DT}" 'BEGIN { v=d/(s*dt); c=int(v); if (v>c) c=c+1; if (c<1) c=1; print c }')
+
+    printf 'interp: seg=%d start=(%s %s %s) end=(%s %s %s) dist=%.2f dwell=%s speed=%.2f steps=%d\n' \
+      "${i}" "${sx}" "${sy}" "${sz}" "${ex}" "${ey}" "${ez}" "${dist}" "${dwell}" "${speed}" "${steps}"
+
+    local include_orientation=0
+    if [[ -n "${sr:-}" && -n "${sp:-}" && -n "${syaw:-}" && -n "${er:-}" && -n "${ep:-}" && -n "${eyaw:-}" ]]; then
+      include_orientation=1
+    fi
+
+    for ((k=1; k<=steps; k++)); do
+      local t x y z
+      t=$(awk -v k="${k}" -v n="${steps}" 'BEGIN { printf "%.10f", k / n }')
+      x=$(awk -v s="${sx}" -v e="${ex}" -v t="${t}" 'BEGIN { printf "%.10f", s + t*(e-s) }')
+      y=$(awk -v s="${sy}" -v e="${ey}" -v t="${t}" 'BEGIN { printf "%.10f", s + t*(e-s) }')
+      z=$(awk -v s="${sz}" -v e="${ez}" -v t="${t}" 'BEGIN { printf "%.10f", s + t*(e-s) }')
+
+      if (( k == steps )); then
+        x="${ex}"
+        y="${ey}"
+        z="${ez}"
+      fi
+
+      printf '  substep %d/%d x=%.2f y=%.2f z=%.2f\n' "${k}" "${steps}" "${x}" "${y}" "${z}"
+
+      if (( include_orientation == 1 )); then
+        local r p yaw qx qy qz qw req
+        r=$(awk -v s="${sr}" -v e="${er}" -v t="${t}" 'BEGIN { printf "%.10f", s + t*(e-s) }')
+        p=$(awk -v s="${sp}" -v e="${ep}" -v t="${t}" 'BEGIN { printf "%.10f", s + t*(e-s) }')
+        yaw=$(awk -v s="${syaw}" -v e="${eyaw}" -v t="${t}" 'BEGIN { printf "%.10f", s + t*(e-s) }')
+
+        if (( k == steps )); then
+          r="${er}"
+          p="${ep}"
+          yaw="${eyaw}"
+        fi
+
+        read -r qx qy qz qw <<< "$(awk -v r="${r}" -v p="${p}" -v y="${yaw}" 'BEGIN { cr=cos(r/2); sr=sin(r/2); cp=cos(p/2); sp=sin(p/2); cy=cos(y/2); sy=sin(y/2); qw=cr*cp*cy + sr*sp*sy; qx=sr*cp*cy - cr*sp*sy; qy=cr*sp*cy + sr*cp*sy; qz=cr*cp*sy - sr*sp*cy; printf "%.10f %.10f %.10f %.10f", qx, qy, qz, qw }')"
+        req="name: \"${model_name}\" position: {x: ${x}, y: ${y}, z: ${z}} orientation: {x: ${qx}, y: ${qy}, z: ${qz}, w: ${qw}}"
+      else
+        local req
+        req="name: \"${model_name}\" position: {x: ${x}, y: ${y}, z: ${z}}"
+      fi
+
+      docker exec iconom-gazebo-1 gz service -s /world/default/set_pose --reqtype gz.msgs.Pose --reptype gz.msgs.Boolean -r "${req}" \
+        > /dev/null 2>&1 || { echo "ERROR: set_pose failed seg=${i} substep=${k}/${steps}" >&2; exit 1; }
+
+      sleep "${DT}"
+    done
   done
 }
 
