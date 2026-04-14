@@ -27,7 +27,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --no-cache-dir requests
-RUN pip3 install --no-cache-dir "numpy<2" "opencv-python-headless<4.10"
+RUN pip3 install --no-cache-dir "numpy<2" "opencv-python-headless<4.10" ultralytics
+RUN mkdir -p /workspaces
+RUN curl -L -o /workspaces/yolov8n.pt https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt
 
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8

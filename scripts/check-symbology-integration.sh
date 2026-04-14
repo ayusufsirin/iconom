@@ -413,6 +413,7 @@ start_symbology_overlay() {
     colcon build --merge-install --packages-select iconom_vision
     source install/setup.bash
     ros2 run iconom_vision camera_symbology_overlay &
+    ros2 run iconom_vision aircraft_detector &
   ' > /tmp/symbology.log 2>&1 &
   
   sleep 5
