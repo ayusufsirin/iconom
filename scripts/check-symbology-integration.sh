@@ -124,7 +124,17 @@ move_rival() {
     local sx sy sz sr sp syaw
     local ex ey ez er ep eyaw
     IFS=',' read -r sx sy sz sr sp syaw <<< "${start_wp}"
+    IFS=',' read -ra start_fields <<< "${start_wp}"
+    if (( ${#start_fields[@]} < 3 )); then
+      echo "ERROR: move_rival: malformed waypoint (need x,y,z): ${start_wp}" >&2
+      exit 1
+    fi
     IFS=',' read -r ex ey ez er ep eyaw <<< "${end_wp}"
+    IFS=',' read -ra end_fields <<< "${end_wp}"
+    if (( ${#end_fields[@]} < 3 )); then
+      echo "ERROR: move_rival: malformed waypoint (need x,y,z): ${end_wp}" >&2
+      exit 1
+    fi
 
     local dist
     dist=$(awk -v sx="${sx}" -v sy="${sy}" -v sz="${sz}" -v ex="${ex}" -v ey="${ey}" -v ez="${ez}" 'BEGIN { dx=ex-sx; dy=ey-sy; dz=ez-sz; printf "%.10f", sqrt(dx*dx + dy*dy + dz*dz) }')
