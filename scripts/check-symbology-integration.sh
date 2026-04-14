@@ -8,6 +8,8 @@ COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
 OVERRIDE_FILE="${ROOT_DIR}/docker-compose.override.yml"
 SIM_WORLD_LOCAL="${ROOT_DIR}/sim/worlds/symbology_test.sdf"
 SIM_WORLD_CONTAINER="/opt/iconom/sim/worlds/symbology_test.sdf"
+RIVAL_INTERP_DT_SEC="${RIVAL_INTERP_DT_SEC:-0.10}"
+RIVAL_INTERP_MAX_STEPS="${RIVAL_INTERP_MAX_STEPS:-200}"
 
 GUI_MODE=false
 COLD_BUILD=false
@@ -101,7 +103,7 @@ move_rival() {
   local waypoints="$2"
   local dwell="${3:-2}"
 
-  local DT="0.10"
+  local DT="${RIVAL_INTERP_DT_SEC}"
 
   if awk -v d="${dwell}" 'BEGIN { exit !(d <= 0) }'; then
     echo "ERROR: move_rival dwell must be > 0 (got ${dwell})" >&2
@@ -137,6 +139,11 @@ move_rival() {
 
     local steps
     steps=$(awk -v d="${dist}" -v s="${speed}" -v dt="${DT}" 'BEGIN { v=d/(s*dt); c=int(v); if (v>c) c=c+1; if (c<1) c=1; print c }')
+
+    if (( steps > RIVAL_INTERP_MAX_STEPS )); then
+      echo "ERROR: move_rival seg=${i} exceeds max steps (${steps} > ${RIVAL_INTERP_MAX_STEPS})" >&2
+      exit 1
+    fi
 
     printf 'interp: seg=%d start=(%s %s %s) end=(%s %s %s) dist=%.2f dwell=%s speed=%.2f steps=%d\n' \
       "${i}" "${sx}" "${sy}" "${sz}" "${ex}" "${ey}" "${ez}" "${dist}" "${dwell}" "${speed}" "${steps}"
