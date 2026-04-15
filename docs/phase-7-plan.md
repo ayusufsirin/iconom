@@ -169,6 +169,36 @@ Success:
 - node publishes estimated rival pose on `/vision/rival_pose`,
 - estimation runs at camera frame rate (~30 Hz).
 
+#### Shared Harness Validation (Slices 3–4)
+
+> This section is MANDATORY for Slice 3 completion.
+
+Slice 3 must be validated inside the shared rival-movement symbology harness defined in "Shared Rival-Movement Validation Harness (Slices 3–4)". Slice 3 cannot pass by running the position estimator in isolation or in an unvalidated scenario.
+
+**Comparison streams** (both required simultaneously):
+1. Reverse-projected truth baseline — from `camera_symbology_overlay` publishing `/plane_01/camera/image_overlay` (3D pose known from `rc_cessna_1` interpolated position)
+2. YOLO-derived position estimation — from the Slice 3 node publishing `/vision/rival_pose` (bounding box → 3D via camera intrinsics)
+
+**Time alignment**: Nearest-timestamp matching; maximum allowed skew: 100 ms.
+
+**Required metrics** (all must be computed during the harness run):
+- **Detection coverage %**: fraction of frames where YOLO produced a valid detection
+- **Timestamp skew**: measured difference between baseline and estimation timestamps (must stay ≤ 100 ms)
+- **Image-plane center error (px)**: Euclidean distance in pixels between projected baseline center and estimated center
+- **Bearing error (deg)**: angular difference in degrees between baseline and estimated bearing to rival
+- **3D position RMSE (m)**: root-mean-square error in meters of the estimated rival position vs. ground truth from the harness
+
+**Artifact requirements** (mandatory — cannot pass without):
+- Raw log of both streams with timestamps
+- Aligned CSV or JSON file containing all five metrics per aligned sample
+- At least one visualization artifact (e.g., overlaid image showing baseline and estimation traces together)
+- All artifacts written to `.sisyphus/evidence/` with naming pattern `task-2-slice3-harness-*`
+
+**Not acceptable**:
+- Manual "looked okay" confirmation
+- Only topic existence proof
+- Comparison without the ground-truth baseline stream
+
 ### Slice 4: EKF Fusion Node
 
 Add one EKF that fuses referee state with camera estimates.
