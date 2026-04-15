@@ -265,8 +265,30 @@ Phase 7 is complete when all of the following are true:
 - fused track rate is 30+ Hz (matching camera frame rate),
 - fused track is demonstrably smoother than raw camera input,
 - headless acceptance script validates the detection-fusion pipeline,
-- detection overlay and fused track are observable in GUI mode,
+- detection overlay and fused track are observable in GUI mode (see Shared Harness Validation Requirement),
 - phase-6 guidance nodes work with fused input without code changes.
+
+### Shared Harness Validation Requirement
+
+Phase 7 cannot be called complete without a successful run of the shared rival-movement symbology harness in both of the following modes:
+
+**Headless mode acceptance**:
+- The shared symbology rival-movement scenario runs headless via `scripts/check-symbology-integration.sh` or equivalent
+- Raw logs, aligned metrics (coverage %, timestamp skew, image-plane center error, bearing error, 3D RMSE), and topic-rate evidence are produced as artifacts
+- Artifacts written to `.sisyphus/evidence/` with naming pattern `task-final-phase7-harness-*`
+- All three streams (baseline, raw visual, fused) are present and time-aligned
+
+**GUI-observable acceptance**:
+- The shared symbology rival-movement scenario runs in GUI mode (`--gui`)
+- Reverse-projected baseline overlay and visual/fused outputs are observable simultaneously
+- Screenshot or recording artifact confirms rival is present in scene and overlays are rendering
+- Artifact written to `.sisyphus/evidence/` as `task-final-phase7-harness-gui.{png,mp4}`
+
+**Evidence bundle**:
+A complete Phase 7 acceptance bundle must contain:
+- Headless run: raw logs + CSV/JSON metrics + topic-rate evidence (min. 3 files)
+- GUI run: at least 1 screenshot or video artifact
+- Naming convention: `task-final-phase7-harness-*`
 
 ## Out of Scope for Phase 7
 
