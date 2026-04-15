@@ -166,7 +166,8 @@ wait_for_detection_activity() {
   log "Waiting up to ${timeout_seconds}s for activity on ${DETECTIONS_TOPIC}..."
   for i in $(seq 1 "${timeout_seconds}"); do
     local pub_count
-    pub_count=$(docker exec "${ROS2_APP}" bash -lc 'set -e; source /opt/ros/humble/setup.bash >/dev/null 2>&1 || true; if [[ -f /workspaces/ros2_ws/install/setup.bash ]]; then source /workspaces/ros2_ws/install/setup.bash >/dev/null 2>&1 || true; fi; ros2 topic info '"${DETECTIONS_TOPIC}"' 2>/dev/null' 2>&1 | grep -c "Publisher count:" || echo "0")
+    pub_count=$(docker exec "${ROS2_APP}" bash -lc 'set -e; source /opt/ros/humble/setup.bash >/dev/null 2>&1 || true; if [[ -f /workspaces/ros2_ws/install/setup.bash ]]; then source /workspaces/ros2_ws/install/setup.bash >/dev/null 2>&1 || true; fi; ros2 topic info '"${DETECTIONS_TOPIC}"' 2>/dev/null' 2>&1 | awk '/Publisher count:/{print $3}')
+    pub_count="${pub_count:-0}"
     if [[ "${pub_count}" -ge 1 ]]; then
       log "PASS: observed ${DETECTIONS_TOPIC} message activity after ${i}s (publisher count: ${pub_count})"
       return 0
