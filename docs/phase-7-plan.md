@@ -209,6 +209,42 @@ Success:
 - node publishes fused state on `/fusion/rival_state` at 30 Hz,
 - fused track is smoother than raw camera input and higher-rate than referee alone.
 
+#### Shared Harness Validation (Slices 3–4)
+
+> This section is MANDATORY for Slice 4 completion.
+
+Slice 4 must be validated inside the shared rival-movement symbology harness defined in "Shared Rival-Movement Validation Harness (Slices 3–4)". Slice 4 cannot pass by running the EKF in isolation or against only one comparison stream.
+
+**Three comparison streams** (all three required simultaneously):
+1. **Reverse-projected baseline** — from `camera_symbology_overlay` publishing `/plane_01/camera/image_overlay` (ground truth from `rc_cessna_1` interpolated position)
+2. **Raw YOLO-derived visual estimate** — from the Slice 3 node publishing `/vision/rival_pose` (bounding box → 3D via camera intrinsics, unfiltered)
+3. **Fused rival state** — from the Slice 4 EKF publishing `/fusion/rival_state` (EKF output combining referee + visual)
+
+**Time alignment**: Nearest-timestamp matching; maximum allowed skew: 100 ms.
+
+**Required metrics** (all must be computed during the harness run):
+- **Timestamp skew**: measured difference between any two streams' timestamps (must stay ≤ 100 ms)
+- **3D position RMSE — raw vs fused**: RMSE in meters of the raw visual estimate vs. fused track relative to ground truth baseline
+- **Bearing error — raw vs fused (deg)**: angular difference in degrees for raw estimate and fused output separately, relative to baseline bearing
+- **Jitter reduction %**: `(stddev(raw_position) - stddev(fused_position)) / stddev(raw_position) * 100` — fused jitter must be lower than raw (positive reduction)
+- **Dropout recovery time (s)**: time elapsed from last valid visual detection until fused track resumes producing estimates after a simulated dropout (when raw estimate goes missing for ≥ 5 frames)
+
+**Improvement gate** (failing this gate fails Slice 4):
+- Jitter reduction % must be > 0 (fused must be smoother than raw)
+- Dropout recovery must complete within 2 seconds
+
+**Artifact requirements** (mandatory — cannot pass without):
+- Raw log of all three streams with timestamps
+- Aligned CSV or JSON containing all metrics per aligned sample
+- Visualization showing raw vs fused trajectory overlaid on baseline
+- All artifacts written to `.sisyphus/evidence/` with naming pattern `task-3-slice4-harness-*`
+
+**Not acceptable**:
+- Raw-vs-fused comparison without the baseline stream
+- "Smoother looks okay" eyeball confirmation
+- Only topic existence proof
+- Dropout recovery time exceeding 2 seconds
+
 ### Slice 5: Integration and Acceptance
 
 Wire the fused track into the guidance chain and validate end-to-end.
