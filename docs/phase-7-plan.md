@@ -117,6 +117,28 @@ Guidance nodes subscribe to `/fusion/rival_state` instead of the raw referee top
 
 ## Implementation Order
 
+## Shared Rival-Movement Validation Harness (Slices 3–4)
+
+> **HARNESS IS MANDATORY FOR SLICES 3 AND 4. IT IS NOT PART OF SLICE 2 ACCEPTANCE.**
+
+The existing rival-movement symbology scenario is the mandatory comparison environment for all later Phase 7 perception and fusion validation. It is not optional, not a "nice-to-have", and not a separate benchmarking world.
+
+**Purpose**: Provides a known-good, ground-truth-validated environment where rival motion is scripted, 3D pose is known, and reverse-projected symbology overlay produces a verifiable baseline. Slices 3 and 4 must compare their output against this baseline.
+
+**Reused components**:
+- `sim/worlds/symbology_test.sdf` — world shell
+- `scripts/check-symbology-integration.sh` — rival movement orchestration, camera/symbology startup
+- `camera_symbology_overlay` node — reverse-projected truth baseline (publishes `/plane_01/camera/image_overlay`)
+- `rc_cessna_1` as scripted rival with known interpolated pose at all times
+
+**Slice 2 boundary**: Slice 2 acceptance remains detector-only. The shared harness does not expand Slice 2 scope.
+
+**Time alignment**: Nearest-timestamp matching with maximum allowed skew of 100 ms.
+
+**Artifact requirements**: Every harness run must produce raw logs, aligned metric summary, and visualization artifacts under `.sisyphus/evidence/`.
+
+**GUI-observable**: The harness must be observable in GUI mode so reviewers can confirm the rival is visually present in the scene during validation runs.
+
 ### Slice 1: Phase 7 Baseline Plan
 
 Pin the exact detection and fusion boundaries, package names, and acceptance goal.
