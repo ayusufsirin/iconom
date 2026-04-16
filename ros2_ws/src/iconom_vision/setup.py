@@ -21,6 +21,7 @@ _ = setup(
             "image_subscriber = iconom_vision.image_subscriber:main",
             "camera_symbology_overlay = iconom_vision.camera_symbology_overlay:main",
             "aircraft_detector = iconom_vision.aircraft_detector:main",
+            "position_estimator = iconom_vision.position_estimator:main",
             "gazebo_pose_publisher = iconom_vision.gazebo_pose_publisher:main",
             "world_state_bridge = iconom_vision.world_state_bridge:main",
             "pose_array_extractor = iconom_vision.pose_array_extractor:main",

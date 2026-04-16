@@ -8,8 +8,10 @@ to produce smooth high-rate rival state for cueing bridge.
 State vector: [x, y, z, vx, vy, vz] (6-element)
 Output: /fusion/rival/state (PoseStamped at 20 Hz)
 """
+# pyright: reportMissingImports=false, reportMissingTypeStubs=false
+
 import math
-from typing import Optional
+from typing import List, Optional
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
@@ -32,6 +34,8 @@ class EKFFusion(Node):
         self.declare_parameter("process_noise", 0.4)
         self.declare_parameter("observation_noise_referee", 0.01)
         self.declare_parameter("observation_noise_live", 0.1)
+        self.declare_parameter("high_rate_input_topic", LIVE_STATE_TOPIC)
+        self.declare_parameter("high_rate_input_requires_follow_lock", True)
         self.declare_parameter("publish_rate_hz", 20.0)
         self.declare_parameter("initial_covariance", 1.0)
         self.declare_parameter("velocity_alpha", 0.3)
@@ -39,9 +43,16 @@ class EKFFusion(Node):
         self.process_noise = float(self.get_parameter("process_noise").value)
         self.obs_noise_referee = float(self.get_parameter("observation_noise_referee").value)
         self.obs_noise_live = float(self.get_parameter("observation_noise_live").value)
+        self.high_rate_input_topic = str(self.get_parameter("high_rate_input_topic").value)
+        self.high_rate_input_requires_follow_lock = bool(
+            self.get_parameter("high_rate_input_requires_follow_lock").value
+        )
         self.publish_rate_hz = float(self.get_parameter("publish_rate_hz").value)
         self.initial_cov = float(self.get_parameter("initial_covariance").value)
         self.velocity_alpha = float(self.get_parameter("velocity_alpha").value)
+
+        if self.high_rate_input_topic != LIVE_STATE_TOPIC:
+            self.high_rate_input_requires_follow_lock = False
 
         self.state = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.covariance = self._init_covariance()
@@ -62,7 +73,7 @@ class EKFFusion(Node):
         self.referee_sub = self.create_subscription(
             PoseStamped, REFEREE_STATE_TOPIC, self._handle_referee, qos)
         self.live_sub = self.create_subscription(
-            PoseStamped, LIVE_STATE_TOPIC, self._handle_live, qos)
+            PoseStamped, self.high_rate_input_topic, self._handle_live, qos)
         self.longitudinal_sub = self.create_subscription(
             String, '/guidance/longitudinal_phase', self._handle_phase, qos)
 
@@ -71,7 +82,10 @@ class EKFFusion(Node):
 
         self.get_logger().info(
             f"EKF fusion: process_noise={self.process_noise}, "
-            f"referee_noise={self.obs_noise_referee}, live_noise={self.obs_noise_live}"
+            f"referee_noise={self.obs_noise_referee}, live_noise={self.obs_noise_live}, "
+            f"high_rate_topic={self.high_rate_input_topic}, "
+            f"follow_lock_gate={self.high_rate_input_requires_follow_lock}, "
+            f"publish_rate_hz={self.publish_rate_hz}"
         )
 
     def _init_covariance(self):
@@ -86,22 +100,32 @@ class EKFFusion(Node):
         self._update_from_measurement(msg, is_referee=True)
 
     def _handle_live(self, msg: PoseStamped) -> None:
-        if self.in_follow_lock:
+        if not self.high_rate_input_requires_follow_lock or self.in_follow_lock:
             self._update_from_measurement(msg, is_referee=False)
 
     def _handle_phase(self, msg: String) -> None:
         self.in_follow_lock = (msg.data.strip().lower() == "follow_lock")
 
     def _update_from_measurement(self, msg: PoseStamped, is_referee: bool) -> None:
-        now = self.get_clock().now().nanoseconds / 1e9
+        msg_time = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         pos = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
+        dt = 0.0
 
         if not (self.referee_received or self.live_received):
             self.state[0], self.state[1], self.state[2] = pos
-            self.last_measurement_time = now
+            self.last_measurement_time = msg_time
             self.last_measurement_pos = pos[:]
             self.referee_received = is_referee
             self.live_received = not is_referee
+            return
+
+        # Guard against stale or out-of-order messages using header timestamps
+        if self.last_measurement_time is not None and msg_time < self.last_measurement_time:
+            self.get_logger().warn(
+                f'Dropping stale measurement: msg_time={msg_time:.3f} '
+                f'< last_measurement_time={self.last_measurement_time:.3f}',
+                throttle_duration_sec=1.0
+            )
             return
 
         if is_referee:
@@ -110,7 +134,7 @@ class EKFFusion(Node):
             self.live_received = True
 
         if self.last_measurement_time is not None:
-            dt = now - self.last_measurement_time
+            dt = msg_time - self.last_measurement_time
             if dt > 0.001:
                 self._predict(dt)
 
@@ -125,7 +149,7 @@ class EKFFusion(Node):
             self.state[4] = self.state[4] * (1 - self.velocity_alpha) + vy * self.velocity_alpha
             self.state[5] = self.state[5] * (1 - self.velocity_alpha) + vz * self.velocity_alpha
 
-        self.last_measurement_time = now
+        self.last_measurement_time = msg_time
         self.last_measurement_pos = pos[:]
 
     def _predict(self, dt: float) -> None:
@@ -140,10 +164,14 @@ class EKFFusion(Node):
             self.covariance[i * 7] += q * dt
             self.covariance[(i + 3) * 7] += q * 0.1
 
-    def _update(self, z: list, obs_noise: float) -> None:
-        x, y, z = self.state[0], self.state[1], self.state[2]
+    def _update(self, measurement: List[float], obs_noise: float) -> None:
+        x_pos, y_pos, z_pos = self.state[0], self.state[1], self.state[2]
 
-        y_vec = [z[0] - x, z[1] - y, z[2] - z]
+        y_vec = [
+            measurement[0] - x_pos,
+            measurement[1] - y_pos,
+            measurement[2] - z_pos,
+        ]
 
         s = [
             self.covariance[0] + obs_noise,
@@ -169,7 +197,15 @@ class EKFFusion(Node):
             return
 
         msg = PoseStamped()
-        msg.header.stamp = self.get_clock().now().to_msg()
+        stamp = self.get_clock().now().to_msg()
+        if self.last_measurement_time is not None:
+            sec = int(self.last_measurement_time)
+            nanosec = int((self.last_measurement_time - sec) * 1e9)
+            if nanosec < 0:
+                nanosec = 0
+            stamp.sec = sec
+            stamp.nanosec = nanosec
+        msg.header.stamp = stamp
         msg.header.frame_id = "fusion"
 
         msg.pose.position.x = self.state[0]

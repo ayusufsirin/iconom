@@ -386,8 +386,8 @@ wait_for_pose_check() {
 wait_for_pose_topics() {
   local timeout="${1:-30}"
   local expected_type="geometry_msgs/msg/PoseStamped"
-  local ownship_topic="/competition/ownship/state"
-  local rival_topic="/fusion/rival/state"
+  local ownship_topic="${OWNSHIP_TOPIC:-/competition/ownship/state}"
+  local rival_topic="${RIVAL_TOPIC:-/fusion/rival/state}"
 
   echo "Waiting for pose topic readiness gate..."
 
@@ -405,6 +405,12 @@ wait_for_pose_topics() {
 
 start_symbology_overlay() {
   local ros2_app="iconom-ros2_app-1"
+  local overlay_image_topic="${OVERLAY_IMAGE_TOPIC:-/plane_01/camera/image_raw}"
+  local overlay_camera_info_topic="${OVERLAY_CAMERA_INFO_TOPIC:-/plane_01/camera/camera_info}"
+  local overlay_ownship_topic="${OVERLAY_OWNSHIP_TOPIC:-/competition/ownship/state}"
+  local overlay_rival_topic="${OVERLAY_RIVAL_TOPIC:-/fusion/rival/state}"
+  local overlay_topic="${OVERLAY_TOPIC:-/plane_01/camera/image_overlay}"
+  local overlay_label="${OVERLAY_LABEL:-}"
   
   echo "Building iconom_vision package..."
   docker exec "${ros2_app}" bash -lc '
@@ -412,7 +418,13 @@ start_symbology_overlay() {
     cd /workspaces/ros2_ws
     colcon build --merge-install --packages-select iconom_vision
     source install/setup.bash
-    ros2 run iconom_vision camera_symbology_overlay &
+    ros2 run iconom_vision camera_symbology_overlay --ros-args \
+      -p image_topic:='"${overlay_image_topic}"' \
+      -p camera_info_topic:='"${overlay_camera_info_topic}"' \
+      -p ownship_topic:='"${overlay_ownship_topic}"' \
+      -p rival_topic:='"${overlay_rival_topic}"' \
+      -p overlay_topic:='"${overlay_topic}"' \
+      -p overlay_label:='"${overlay_label}"' &
     ros2 run iconom_vision aircraft_detector &
   ' > /tmp/symbology.log 2>&1 &
   

@@ -6,6 +6,9 @@ Subscribes to camera image, camera info, ownship pose, and rival pose.
 Projects rival 3D position to 2D image coordinates and overlays a marker.
 Publishes the augmented image to /plane_01/camera/image_overlay.
 """
+from __future__ import annotations
+
+# pyright: reportAny=false, reportExplicitAny=false, reportMissingImports=false, reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportUnusedFunction=false, reportUnannotatedClassAttribute=false, reportPossiblyUnboundVariable=false, reportMissingTypeArgument=false, reportUnusedImport=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportAttributeAccessIssue=false, reportImplicitStringConcatenation=false, reportUntypedBaseClass=false, reportUnusedCallResult=false, reportUnusedParameter=false
 import cv2
 import numpy as np
 
@@ -16,18 +19,25 @@ from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image
 
 
-IMAGE_TOPIC = "/plane_01/camera/image_raw"
-CAMERA_INFO_TOPIC = "/plane_01/camera/camera_info"
-RIVAL_STATE_TOPIC = "/fusion/rival/state"
-OWNSHIP_STATE_TOPIC = "/competition/ownship/state"
-OVERLAY_TOPIC = "/plane_01/camera/image_overlay"
-
-
 class CameraSymbologyOverlay(Node):
     def __init__(self) -> None:
         super().__init__("camera_symbology_overlay")
 
         self.bridge = CvBridge()
+
+        self.declare_parameter("image_topic", "/plane_01/camera/image_raw")
+        self.declare_parameter("camera_info_topic", "/plane_01/camera/camera_info")
+        self.declare_parameter("ownship_topic", "/competition/ownship/state")
+        self.declare_parameter("rival_topic", "/fusion/rival/state")
+        self.declare_parameter("overlay_topic", "/plane_01/camera/image_overlay")
+        self.declare_parameter("overlay_label", "")
+
+        self.image_topic = str(self.get_parameter("image_topic").value)
+        self.camera_info_topic = str(self.get_parameter("camera_info_topic").value)
+        self.ownship_topic = str(self.get_parameter("ownship_topic").value)
+        self.rival_topic = str(self.get_parameter("rival_topic").value)
+        self.overlay_topic = str(self.get_parameter("overlay_topic").value)
+        self.overlay_label = str(self.get_parameter("overlay_label").value)
 
         self.camera_info_msg: CameraInfo | None = None
         self.ownship_pose: PoseStamped | None = None
@@ -37,24 +47,24 @@ class CameraSymbologyOverlay(Node):
         self._log_interval = 30
 
         self.image_sub = self.create_subscription(
-            Image, IMAGE_TOPIC, self._handle_image, 10
+            Image, self.image_topic, self._handle_image, 10
         )
         self.camera_info_sub = self.create_subscription(
-            CameraInfo, CAMERA_INFO_TOPIC, self._handle_camera_info, 10
+            CameraInfo, self.camera_info_topic, self._handle_camera_info, 10
         )
         self.rival_sub = self.create_subscription(
-            PoseStamped, RIVAL_STATE_TOPIC, self._handle_rival, 10
+            PoseStamped, self.rival_topic, self._handle_rival, 10
         )
         self.ownship_sub = self.create_subscription(
-            PoseStamped, OWNSHIP_STATE_TOPIC, self._handle_ownship, 10
+            PoseStamped, self.ownship_topic, self._handle_ownship, 10
         )
 
-        self.overlay_pub = self.create_publisher(Image, OVERLAY_TOPIC, 10)
+        self.overlay_pub = self.create_publisher(Image, self.overlay_topic, 10)
 
         self.get_logger().info(
-            f"camera_symbology_overlay started: subscribing to {IMAGE_TOPIC}, "
-            f"{CAMERA_INFO_TOPIC}, {RIVAL_STATE_TOPIC}, {OWNSHIP_STATE_TOPIC}; "
-            f"publishing to {OVERLAY_TOPIC}"
+            f"camera_symbology_overlay started: subscribing to {self.image_topic}, "
+            f"{self.camera_info_topic}, {self.rival_topic}, {self.ownship_topic}; "
+            f"publishing to {self.overlay_topic}; label={self.overlay_label!r}"
         )
 
     def _handle_camera_info(self, msg: CameraInfo) -> None:
@@ -124,9 +134,9 @@ class CameraSymbologyOverlay(Node):
             if self._log_counter % self._log_interval == 0:
                 missing = []
                 if self.rival_pose is None:
-                    missing.append(f"rival_pose (subscribed to {RIVAL_STATE_TOPIC})")
+                    missing.append(f"rival_pose (subscribed to {self.rival_topic})")
                 if self.ownship_pose is None:
-                    missing.append(f"ownship_pose (subscribed to {OWNSHIP_STATE_TOPIC})")
+                    missing.append(f"ownship_pose (subscribed to {self.ownship_topic})")
                 self.get_logger().warn(f"no marker: missing {', '.join(missing)}")
         else:
             projected = self._project_3d_to_2d(self.rival_pose, self.ownship_pose)
@@ -195,6 +205,17 @@ class CameraSymbologyOverlay(Node):
         cv2.circle(overlay, (u, v), radius, color, thickness)
         cv2.line(overlay, (u - 30, v), (u + 30, v), color, thickness)
         cv2.line(overlay, (u, v - 30), (u, v + 30), color, thickness)
+        if self.overlay_label:
+            cv2.putText(
+                overlay,
+                self.overlay_label,
+                (u + 24, v - 24),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                color,
+                2,
+                cv2.LINE_AA,
+            )
 
 
 def main() -> int:

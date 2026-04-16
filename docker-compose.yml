@@ -232,6 +232,8 @@ services:
       OWNSHIP_MODEL: ${OWNSHIP_MODEL:-rc_cessna_0}
       RIVAL_MODEL: ${RIVAL_MODEL:-rc_cessna_1}
       POLL_RATE: ${POLL_RATE:-10.0}
+      OWNSHIP_TOPIC: ${OWNSHIP_TOPIC:-/competition/ownship/state}
+      RIVAL_TOPIC: ${RIVAL_TOPIC:-/fusion/rival/state}
       USE_SIM_TIME: ${USE_SIM_TIME:-true}
     depends_on:
       gazebo:

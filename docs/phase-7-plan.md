@@ -74,8 +74,8 @@ Use a lightweight YOLO model (YOLOv8-nano or YOLOv11-nano) for real-time detecti
 
 - Subscribe to `/plane_01/camera/image_raw`
 - Run inference using Ultralytics YOLO (Python, GPU-capable)
-- Publish detections as bounding boxes with confidence scores
-- Topic: `/vision/detections` (custom message or visualization markers)
+- Publish detections as `visualization_msgs/msg/MarkerArray` on `/vision/detections`
+- Topic: `/vision/detections` remains the detector output as `visualization_msgs/msg/MarkerArray`
 
 **Reference**: `mgonzs13/yolov8_ros` provides ROS 2-native YOLO integration.
 
@@ -85,7 +85,7 @@ Convert 2D bounding box to 3D position using camera model:
 
 - Use `/plane_01/camera/camera_info` for camera intrinsics (K matrix)
 - Apply monocular depth estimation or assume known rival size for scaling
-- Publish estimated rival pose in local frame
+- Publish estimated rival pose in world frame
 - Topic: `/vision/rival_pose` (PoseStamped)
 
 For the simulation baseline, the known aircraft size (`gz_rc_cessna` dimensions) provides depth scaling without needing a separate depth estimator.
@@ -96,12 +96,12 @@ Implement an Extended Kalman Filter (EKF) that fuses:
 
 | Source | Rate | Quality |
 |--------|------|---------|
-| Referee (`/competition/rival/state`) | 1 Hz | Ground truth, but delayed |
+| Referee (`/competition/rival/state/referee`) | 1 Hz | Ground truth, but delayed |
 | Camera estimate (`/vision/rival_pose`) | ~30 Hz | Noisy, high-rate |
 
-- Use `robot_localization` ekf node OR implement a custom Python EKF
+- Use the existing `iconom_competition/ekf_fusion.py` EKF node with Phase-7 parameter mode
 - State vector: position (x, y, z), velocity (vx, vy, vz)
-- Publish fused state at 30 Hz on `/fusion/rival_state`
+- Publish fused state at 30 Hz on `/fusion/rival/state`, with exactly one publisher, the EKF node
 - The fused track replaces the raw referee feed for downstream guidance
 
 ### Integration with Phase 6
@@ -110,10 +110,10 @@ The fused track from Phase 7 feeds into the existing phase-6 guidance chain:
 
 ```
 Phase 6 input (before):  /competition/rival/state (1 Hz)
-Phase 7 output (after):  /fusion/rival_state (30 Hz)
+Phase 7 output (after):  /fusion/rival/state (30 Hz)
 ```
 
-Guidance nodes subscribe to `/fusion/rival_state` instead of the raw referee topic. No changes to phase-6 guidance logic required.
+Guidance nodes subscribe to `/fusion/rival/state` instead of the raw referee topic. No changes to phase-6 guidance logic required.
 
 ## Implementation Order
 
@@ -124,6 +124,8 @@ Guidance nodes subscribe to `/fusion/rival_state` instead of the raw referee top
 The existing rival-movement symbology scenario is the mandatory comparison environment for all later Phase 7 perception and fusion validation. It is not optional, not a "nice-to-have", and not a separate benchmarking world.
 
 **Purpose**: Provides a known-good, ground-truth-validated environment where rival motion is scripted, 3D pose is known, and reverse-projected symbology overlay produces a verifiable baseline. Slices 3 and 4 must compare their output against this baseline.
+
+**Truth stream**: Slice 3 and Slice 4 harness truth comes from `/truth/rival/state`, so `/fusion/rival/state` stays a single-publisher EKF output during validation.
 
 **Reused components**:
 - `sim/worlds/symbology_test.sdf` — world shell
@@ -206,7 +208,7 @@ Add one EKF that fuses referee state with camera estimates.
 Success:
 
 - node subscribes to both `/competition/rival/state` (1 Hz) and `/vision/rival_pose` (30 Hz),
-- node publishes fused state on `/fusion/rival_state` at 30 Hz,
+- node publishes fused state on `/fusion/rival/state` at 30 Hz as the only publisher on that topic,
 - fused track is smoother than raw camera input and higher-rate than referee alone.
 
 #### Shared Harness Validation (Slices 3–4)
@@ -218,7 +220,7 @@ Slice 4 must be validated inside the shared rival-movement symbology harness def
 **Three comparison streams** (all three required simultaneously):
 1. **Reverse-projected baseline** — from `camera_symbology_overlay` publishing `/plane_01/camera/image_overlay` (ground truth from `rc_cessna_1` interpolated position)
 2. **Raw YOLO-derived visual estimate** — from the Slice 3 node publishing `/vision/rival_pose` (bounding box → 3D via camera intrinsics, unfiltered)
-3. **Fused rival state** — from the Slice 4 EKF publishing `/fusion/rival_state` (EKF output combining referee + visual)
+3. **Fused rival state** — from the Slice 4 EKF publishing `/fusion/rival/state` (EKF output combining referee + visual, and the only publisher on the topic)
 
 **Time alignment**: Nearest-timestamp matching; maximum allowed skew: 100 ms.
 
@@ -251,7 +253,7 @@ Wire the fused track into the guidance chain and validate end-to-end.
 
 Success:
 
-- downstream guidance nodes consume `/fusion/rival_state` without modification,
+- downstream guidance nodes consume `/fusion/rival/state` without modification,
 - headless acceptance script validates detection + fusion pipeline,
 - GUI mode shows detection overlay and fused track visualization.
 
@@ -261,7 +263,7 @@ Phase 7 is complete when all of the following are true:
 
 - one YOLO detector publishes bounding boxes on `/vision/detections`,
 - one position estimator publishes 3D pose on `/vision/rival_pose`,
-- one EKF fusion node publishes high-rate track on `/fusion/rival_state`,
+- one EKF fusion node publishes high-rate track on `/fusion/rival/state`, and it is the only publisher on that topic,
 - fused track rate is 30+ Hz (matching camera frame rate),
 - fused track is demonstrably smoother than raw camera input,
 - headless acceptance script validates the detection-fusion pipeline,
@@ -313,9 +315,9 @@ Phase 7 should add files in this shape:
 - `scripts/check-phase7-fusion.sh` — EKF fusion validation
 - `scripts/phase7-acceptance.sh` — full pipeline validation
 - `ros2_ws/src/iconom_vision/` — vision processing package (expand existing)
-  - `detector.py` — YOLO-based aircraft detection
+  - `aircraft_detector.py` — YOLO-based aircraft detection
   - `position_estimator.py` — bbox to 3D pose conversion
-  - `ekf_fuser.py` — EKF state fusion
+- `ros2_ws/src/iconom_competition/iconom_competition/ekf_fusion.py` — EKF state fusion
 - `ros2_ws/src/iconom_vision/msg/Detections.msg` — bounding box message (if needed)
 
 ## First Step After This Plan

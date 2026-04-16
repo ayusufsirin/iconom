@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-# pyright: reportMissingImports=false, reportMissingTypeStubs=false, reportGeneralTypeIssues=false, reportInvalidTypeForm=false, reportCallIssue=false
+# pyright: reportAny=false, reportExplicitAny=false, reportMissingImports=false, reportMissingTypeStubs=false, reportGeneralTypeIssues=false, reportInvalidTypeForm=false, reportCallIssue=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnannotatedClassAttribute=false, reportUnusedImport=false, reportAttributeAccessIssue=false, reportImplicitStringConcatenation=false, reportIndexIssue=false, reportUnusedParameter=false, reportUnusedCallResult=false, reportUntypedBaseClass=false
 import argparse
 import sys
 from typing import Any, List, Optional, Tuple
 
 try:
     import rclpy
+    from builtin_interfaces.msg import Time
     from geometry_msgs.msg import PoseStamped
     from rclpy.node import Node
 except ModuleNotFoundError:
     rclpy = None  # type: ignore[assignment]
     PoseStamped = Any  # type: ignore[assignment,misc]
+    Time = Any  # type: ignore[assignment,misc]
     Node = object
 
 try:
@@ -28,23 +30,28 @@ class GzModelPollBridge(Node):
         self.declare_parameter('ownship_model', 'rc_cessna_0')
         self.declare_parameter('rival_model', 'rc_cessna_1')
         self.declare_parameter('poll_rate', 10.0)
+        self.declare_parameter('ownship_topic', '/competition/ownship/state')
+        self.declare_parameter('rival_topic', '/truth/rival/state')
 
         self.ownship_model = str(self.get_parameter('ownship_model').value)
         self.rival_model = str(self.get_parameter('rival_model').value)
         self.poll_rate = float(self.get_parameter('poll_rate').value)
+        self.ownship_topic = str(self.get_parameter('ownship_topic').value)
+        self.rival_topic = str(self.get_parameter('rival_topic').value)
 
         if gt is None or Pose_V is None:
             raise RuntimeError('gz transport python bindings are not available (expected gz.transport13 + gz.msgs10)')
 
-        self.ownship_pub = self.create_publisher(PoseStamped, '/competition/ownship/state', 10)
-        self.rival_pub = self.create_publisher(PoseStamped, '/fusion/rival/state', 10)
+        self.ownship_pub = self.create_publisher(PoseStamped, self.ownship_topic, 10)
+        self.rival_pub = self.create_publisher(PoseStamped, self.rival_topic, 10)
 
         self._gz_node = gt.Node()
         self._subscribe_pose_info('/world/default/pose/info')
 
         self.get_logger().info(
             f'GZ model poll bridge started: subscribing /world/default/pose/info '
-            f'for {self.ownship_model} and {self.rival_model}'
+            f'for {self.ownship_model} and {self.rival_model}; '
+            f'publishing ownship={self.ownship_topic}, rival={self.rival_topic}'
         )
 
     def _subscribe_pose_info(self, topic_name: str) -> None:
@@ -76,7 +83,7 @@ class GzModelPollBridge(Node):
         if pose_vector is None:
             return
 
-        stamp = self.get_clock().now().to_msg()
+        stamp = self._stamp_from_pose_vector(pose_vector)
 
         for pose in pose_vector.pose:
             model_name = getattr(pose, 'name', '')
@@ -127,6 +134,31 @@ class GzModelPollBridge(Node):
         ros_pose.pose.orientation.z = float(pose.orientation.z)
         ros_pose.pose.orientation.w = float(pose.orientation.w)
         return ros_pose
+
+    def _stamp_from_pose_vector(self, pose_vector: Any) -> Time:
+        default_stamp = self.get_clock().now().to_msg()
+        header = getattr(pose_vector, 'header', None)
+        if header is None:
+            return default_stamp
+        gz_stamp = getattr(header, 'stamp', None)
+        if gz_stamp is None:
+            return default_stamp
+
+        sec = getattr(gz_stamp, 'sec', None)
+        if sec is None:
+            sec = getattr(gz_stamp, 'sec()', None)
+
+        nsec = getattr(gz_stamp, 'nsec', None)
+        if nsec is None:
+            nsec = getattr(gz_stamp, 'nsec()', None)
+
+        if sec is None or nsec is None:
+            return default_stamp
+
+        stamp = Time()
+        stamp.sec = int(sec)
+        stamp.nanosec = int(nsec)
+        return stamp
 
 
 def _parse_cli_args(argv: List[str]) -> Tuple[argparse.Namespace, List[str]]:

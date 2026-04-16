@@ -27,4 +27,6 @@ echo "checking ROS setup... OK"
 
 echo "pose bridge service ready"
 
-exec python3 /usr/local/bin/pose_bridge.py
+exec python3 /usr/local/bin/pose_bridge.py --ros-args \
+  -p ownship_topic:=${OWNSHIP_TOPIC:-/competition/ownship/state} \
+  -p rival_topic:=${RIVAL_TOPIC:-/fusion/rival/state}
