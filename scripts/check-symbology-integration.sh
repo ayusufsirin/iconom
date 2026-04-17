@@ -223,8 +223,8 @@ start_services() {
   GAZEBO_WORLD_FILE="${SIM_WORLD_CONTAINER}" docker compose "${profile_args[@]}" up -d gazebo
   wait_for_gazebo 30
   
-  echo "Starting ros2_app..."
-  docker compose "${profile_args[@]}" up -d ros2_app
+  echo "Starting ros2_app + detector..."
+  docker compose "${profile_args[@]}" up -d ros2_app detector
   
   echo "Starting ros_gz_bridge..."
   docker compose "${profile_args[@]}" up -d ros_gz_bridge ros_gz_bridge_plane_02 ros_gz_bridge_pose
@@ -425,7 +425,6 @@ start_symbology_overlay() {
       -p rival_topic:='"${overlay_rival_topic}"' \
       -p overlay_topic:='"${overlay_topic}"' \
       -p overlay_label:='"${overlay_label}"' &
-    ros2 run iconom_vision aircraft_detector &
   ' > /tmp/symbology.log 2>&1 &
   
   sleep 5
@@ -442,6 +441,9 @@ main() {
   
   wait_for_camera_topics 45
   verify_topic_data 20
+
+  echo "Waiting for detector container startup..."
+  sleep 5
   
   start_symbology_overlay
   

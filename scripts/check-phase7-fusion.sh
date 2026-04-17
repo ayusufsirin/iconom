@@ -7,6 +7,7 @@ OVERRIDE_FILE="${ROOT_DIR}/docker-compose.override.yml"
 SIM_WORLD_CONTAINER="${PHASE7_WORLD_FILE:-/opt/PX4-Autopilot/Tools/simulation/gz/worlds/default.sdf}"
 
 ROS2_APP="iconom-ros2_app-1"
+DETECTOR_CONTAINER="iconom-detector-1"
 GAZEBO="iconom-gazebo-1"
 
 CAMERA_TOPIC="/plane_01/camera/image_raw"
@@ -78,7 +79,7 @@ cleanup() {
 snapshot_artifacts() {
   mkdir -p "${EVIDENCE_DIR}"
 
-  docker exec "${ROS2_APP}" bash -lc 'cat /tmp/task-3-slice4-harness-detector.log' \
+  docker logs "${DETECTOR_CONTAINER}" \
     > "${EVIDENCE_DIR}/${PREFIX}-detector.log" 2>/dev/null || true
   docker exec "${ROS2_APP}" bash -lc 'cat /tmp/task-3-slice4-harness-estimator.log' \
     > "${EVIDENCE_DIR}/${PREFIX}-estimator.log" 2>/dev/null || true
@@ -344,9 +345,10 @@ start_services() {
     RIVAL_MODEL="rc_cessna_1" \
     OWNSHIP_TOPIC="${OWNSHIP_TOPIC}" \
     RIVAL_TOPIC="${TRUTH_TOPIC}" \
-    docker compose "${compose_args[@]}" up -d gazebo xrce_agent ros2_app ros_gz_bridge ros_gz_bridge_pose
+    docker compose "${compose_args[@]}" up -d gazebo xrce_agent ros2_app ros_gz_bridge ros_gz_bridge_pose detector
 
   wait_for_gazebo 30
+  sleep 5
 }
 
 build_and_start_nodes() {
@@ -360,7 +362,6 @@ build_and_start_nodes() {
     fi
     source install/setup.bash >/dev/null 2>&1 || true
 
-    nohup ros2 run iconom_vision aircraft_detector >/tmp/task-3-slice4-harness-detector.log 2>&1 &
     nohup ros2 run iconom_vision position_estimator --ros-args \
       -p detections_topic:="/vision/detections" \
       -p camera_info_topic:="/plane_01/camera/camera_info" \

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from . import __init__ as iconom_vision  # noqa: F401
 import rclpy
+import torch
 from cv_bridge import CvBridge, CvBridgeError
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -24,8 +25,9 @@ class AircraftDetector(Node):
 
         self.bridge = CvBridge()
         self.model = YOLO(MODEL_PATH)
-        self.model.to("cpu")
-        self._predict_kwargs = {"device": "cpu", "verbose": False}
+        _device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model.to(_device)
+        self._predict_kwargs = {"device": _device, "verbose": False}
 
         self._frame_count = 0
         self._empty_count = 0
@@ -44,7 +46,7 @@ class AircraftDetector(Node):
         self.get_logger().info(
             f"aircraft_detector started: subscribing to {IMAGE_TOPIC}; "
             f"publishing to {DETECTIONS_TOPIC}; model={MODEL_PATH}; "
-            f"allowed_classes={sorted(self._allowed_labels)}"
+            f"device={_device}; allowed_classes={sorted(self._allowed_labels)}"
         )
 
     def _resolve_allowed_labels(self) -> set[str]:

@@ -6,6 +6,7 @@ COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
 SIM_WORLD_CONTAINER="/opt/iconom/sim/worlds/symbology_test.sdf"
 
 ROS2_APP="iconom-ros2_app-1"
+DETECTOR_CONTAINER="iconom-detector-1"
 CAMERA_TOPIC="/plane_01/camera/image_raw"
 DETECTIONS_TOPIC="/vision/detections"
 
@@ -28,13 +29,11 @@ capture_evidence() {
   local evidence_dir="${ROOT_DIR}/.sisyphus/evidence"
   mkdir -p "${evidence_dir}"
 
-  # Capture detector log if it exists
-  docker exec "${ROS2_APP}" bash -lc 'cat /tmp/aircraft_detector.log' > "${evidence_dir}/task-2-detector.log" 2>/dev/null || true
+  docker logs "${DETECTOR_CONTAINER}" > "${evidence_dir}/task-2-detector.log" 2>/dev/null || true
+  docker ps --filter "name=iconom-detector" --format "{{.Names}}" > "${evidence_dir}/task-2-detector-container.txt" 2>/dev/null || true
 
   docker exec "${ROS2_APP}" bash -lc 'python3 -c "import numpy; print(numpy.__version__)"' > "${evidence_dir}/task-2-numpy-version.txt" 2>/dev/null || true
   docker exec "${ROS2_APP}" bash -lc 'source /opt/ros/humble/setup.bash >/dev/null 2>&1; python3 -c "import cv_bridge; print(cv_bridge.__version__ if hasattr(cv_bridge, \"__version__\") else \"ok\")"' > "${evidence_dir}/task-2-cv-bridge-version.txt" 2>/dev/null || true
-  docker exec "${ROS2_APP}" bash -lc 'python3 -c "import ultralytics; print(ultralytics.__version__)"' > "${evidence_dir}/task-2-ultralytics-version.txt" 2>/dev/null || true
-  docker exec "${ROS2_APP}" bash -lc 'python3 -c "from ultralytics import YOLO; YOLO(\"/workspaces/yolov8n.pt\"); print(\"model load ok\")"' > "${evidence_dir}/task-2-yolo-load.txt" 2>/dev/null || true
 
   # Capture topic list
   docker exec "${ROS2_APP}" bash -lc 'source /opt/ros/humble/setup.bash >/dev/null 2>&1; if [[ -f /workspaces/ros2_ws/install/setup.bash ]]; then source /workspaces/ros2_ws/install/setup.bash >/dev/null 2>&1; fi; ros2 topic list' > "${evidence_dir}/task-2-topic-list.txt" 2>/dev/null || true
@@ -46,7 +45,7 @@ capture_evidence() {
 }
 
 preflight_checks() {
-  log "Running preflight checks inside ros2_app container..."
+  log "Running preflight checks for detector container and ROS topics..."
 
   local numpy_version numpy_major
   numpy_version=$(docker exec "${ROS2_APP}" bash -lc 'python3 -c "import numpy; print(numpy.__version__)"' 2>/dev/null) || {
@@ -63,23 +62,13 @@ preflight_checks() {
   fi
   log "Preflight: cv_bridge import OK"
 
-  # Check ultralytics import
-  if ! docker exec "${ROS2_APP}" bash -lc 'python3 -c "import ultralytics; print(ultralytics.__version__)"' >/dev/null 2>&1; then
-    fail "PREFLIGHT FAILED: ultralytics not importable inside ros2_app. Is the image rebuilt?"
+  if ! docker ps --filter "name=iconom-detector" --format "{{.Names}}" | grep -q "iconom-detector"; then
+    fail "PREFLIGHT FAILED: detector container is not running"
   fi
-  log "Preflight: ultralytics import OK"
+  log "Preflight: detector container running"
 
-  # Check model file exists
-  if ! docker exec "${ROS2_APP}" bash -lc 'test -s /workspaces/yolov8n.pt' >/dev/null 2>&1; then
-    fail "PREFLIGHT FAILED: /workspaces/yolov8n.pt missing or empty. Is the image rebuilt?"
-  fi
-  log "Preflight: yolov8n.pt exists and non-zero"
-
-  # Check model loads
-  if ! docker exec "${ROS2_APP}" bash -lc "python3 -c \"from ultralytics import YOLO; YOLO('/workspaces/yolov8n.pt'); print('model load ok')\"" >/dev/null 2>&1; then
-    fail "PREFLIGHT FAILED: YOLO cannot load /workspaces/yolov8n.pt"
-  fi
-  log "Preflight: YOLO model load OK"
+  log "Preflight: waiting for detector topic..."
+  wait_for_detector_topic 60
 }
 
 trap cleanup EXIT
@@ -97,6 +86,21 @@ wait_for_gazebo() {
   done
 
   fail "Gazebo did not become ready within ${timeout_seconds}s"
+}
+
+wait_for_detector_topic() {
+  local timeout_seconds="${1:-60}"
+
+  log "Waiting for detector topic ${DETECTIONS_TOPIC}..."
+  for i in $(seq 1 "${timeout_seconds}"); do
+    if docker exec "${ROS2_APP}" bash -lc 'source /opt/ros/humble/setup.bash >/dev/null 2>&1; if [[ -f /workspaces/ros2_ws/install/setup.bash ]]; then source /workspaces/ros2_ws/install/setup.bash >/dev/null 2>&1; fi; ros2 topic list' 2>/dev/null | grep -Fxq "${DETECTIONS_TOPIC}"; then
+      log "Detector topic ready after ${i}s"
+      return 0
+    fi
+    sleep 1
+  done
+
+  fail "Detector topic did not become available within ${timeout_seconds}s"
 }
 
 spawn_plane() {
@@ -119,8 +123,10 @@ start_services() {
   log "Starting required services with symbology profile..."
   docker compose -f "${COMPOSE_FILE}" --profile symbology down --remove-orphans 2>/dev/null || true
   GAZEBO_WORLD_FILE="${SIM_WORLD_CONTAINER}" \
-    docker compose -f "${COMPOSE_FILE}" --profile symbology up -d gazebo xrce_agent ros2_app ros_gz_bridge
+    docker compose -f "${COMPOSE_FILE}" --profile symbology up -d gazebo xrce_agent ros2_app ros_gz_bridge detector
   wait_for_gazebo 30
+  log "Waiting for detector container startup..."
+  sleep 5
 }
 
 wait_for_topic() {
@@ -144,20 +150,6 @@ wait_for_topic() {
   done
 
   fail "Timed out waiting for topic availability: ${topic}"
-}
-
-start_detector() {
-  log "Building and launching aircraft detector..."
-  docker exec "${ROS2_APP}" bash -lc '
-    set -e
-    source /opt/ros/humble/setup.bash >/dev/null 2>&1 || true
-    cd /workspaces/ros2_ws
-    colcon build --merge-install --packages-select iconom_vision 2>&1 | tail -5
-    source install/setup.bash >/dev/null 2>&1 || true
-    nohup ros2 run iconom_vision aircraft_detector >/tmp/aircraft_detector.log 2>&1 &
-    disown
-  '
-  log "Aircraft detector launched"
 }
 
 wait_for_detection_activity() {
@@ -189,7 +181,6 @@ main() {
 
   wait_for_topic "${CAMERA_TOPIC}" 30
 
-  start_detector
   wait_for_topic "${DETECTIONS_TOPIC}" 10
   wait_for_detection_activity 10
 
