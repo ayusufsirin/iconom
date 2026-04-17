@@ -17,25 +17,33 @@ PLANE1_LOITER_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane01-loiter.log"
 PLANE1_STATUS_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane01-status.log"
 PLANE1_POSITION_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane01-position.log"
 PLANE1_MODE_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane01-mode.log"
+# shellcheck disable=SC2034
 PLANE1_AIRBORNE_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane01-airborne.log"
 PLANE1_LAND_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane01-land.log"
+# shellcheck disable=SC2034
 PLANE1_LAND_POSITION_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane01-land-position.log"
 PLANE1_LAND_DETECTED_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane01-land-detected.log"
 PLANE2_ARM_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-arm.log"
 PLANE2_TAKEOFF_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-takeoff.log"
 PLANE2_LOITER_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-loiter.log"
 PLANE2_REPOSITION_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-reposition.log"
+# shellcheck disable=SC2034
 PLANE2_ROUTE_POINT1_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-route-point1.log"
+# shellcheck disable=SC2034
 PLANE2_ROUTE_POINT2_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-route-point2.log"
+# shellcheck disable=SC2034
 PLANE2_ROUTE_POINT3_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-route-point3.log"
+# shellcheck disable=SC2034
 PLANE2_ROUTE_POINT4_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-route-point4.log"
 PLANE2_LAND_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-land.log"
+# shellcheck disable=SC2034
 PLANE2_LAND_POSITION_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-land-position.log"
 PLANE2_LAND_DETECTED_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-land-detected.log"
 PLANE2_STATUS_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-status.log"
 PLANE2_POSITION_LOG="${ROOT_DIR}/.tmp-phase7-mission-plane02-position.log"
 OWNSHIP_ADAPTER_LOG="${ROOT_DIR}/.tmp-phase7-mission-ownship.log"
 RIVAL_ADAPTER_LOG="${ROOT_DIR}/.tmp-phase7-mission-rival.log"
+# shellcheck disable=SC2034
 EKF_FUSION_LOG="${ROOT_DIR}/.tmp-phase7-mission-ekf.log"
 VISUAL_EKF_LOG="${ROOT_DIR}/.tmp-phase7-mission-visual-ekf.log"
 VISUAL_ESTIMATOR_LOG="${ROOT_DIR}/.tmp-phase7-mission-position-estimator.log"
@@ -67,6 +75,11 @@ VISUAL_ESTIMATOR_PID=""
 COMPETITION_CLIENT_PID=""
 COLD_BUILD="${ICONOM_PHASE7_COLD_BUILD:-${ICONOM_PHASE6_COLD_BUILD:-0}}"
 service=""
+MISSION_STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+MISSION_EVIDENCE_DIR="${ROOT_DIR}/.sisyphus/evidence"
+MISSION_EVIDENCE_BASE="${MISSION_EVIDENCE_DIR}/phase7-mission-${MISSION_STAMP}"
+MISSION_EVIDENCE_CSV="${MISSION_EVIDENCE_BASE}.csv"
+MISSION_EVIDENCE_CZML="${MISSION_EVIDENCE_BASE}.czml"
 
 usage() {
   cat <<'USAGE'
@@ -159,6 +172,7 @@ ros2_exec() {
   "${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" exec -T ros2_app bash -lc "$1"
 }
 
+# shellcheck disable=SC1090
 source "${ROOT_DIR}/scripts/phase6-sim-time.sh"
 
 run_status_waiter() {
@@ -681,24 +695,41 @@ LOITER_NAV_STATE="${PX4_EXPECTED_LOITER_NAV_STATE:-4}"
 OFFBOARD_NAV_STATE="${PX4_EXPECTED_OFFBOARD_NAV_STATE:-14}"
 TAKEOFF_MIN_DELTA_XY_NORM="${PX4_EXPECTED_TAKEOFF_MIN_DELTA_XY_NORM:-5.0}"
 TAKEOFF_MAX_DELTA_Z="${PX4_EXPECTED_TAKEOFF_MAX_DELTA_Z:--0.5}"
+# shellcheck disable=SC2034
 BEARING_ERROR_TOPIC="/guidance/bearing_error_deg"
+# shellcheck disable=SC2034
 INITIAL_BEARING_ERROR_MIN_DEG="${PHASE6_INITIAL_BEARING_ERROR_MIN_DEG:-45.0}"
+# shellcheck disable=SC2034
 INITIAL_CUE_ERROR_MIN_DEG="${PHASE6_INITIAL_CUE_ERROR_MIN_DEG:-35.0}"
+# shellcheck disable=SC2034
 FINAL_BEARING_ERROR_MAX_DEG="${PHASE6_FINAL_BEARING_ERROR_MAX_DEG:-25.0}"
+# shellcheck disable=SC2034
 FINAL_CUE_ERROR_MAX_DEG="${PHASE6_FINAL_CUE_ERROR_MAX_DEG:-25.0}"
+# shellcheck disable=SC2034
 BEARING_IMPROVEMENT_MIN_DEG="${PHASE6_BEARING_IMPROVEMENT_MIN_DEG:-40.0}"
+# shellcheck disable=SC2034
 RIVAL_MIN_ROUTE_DISTANCE_M="${PHASE6_RIVAL_MIN_ROUTE_DISTANCE_M:-20.0}"
+# shellcheck disable=SC2034
 CUE_HOLD_SEC="${PHASE6_TRACK_HOLD_MIN_SEC:-${PHASE6_CUE_HOLD_SEC:-10}}"
+# shellcheck disable=SC2034
 CUE_ERROR_TIMEOUT_SEC="${PHASE6_CUE_ERROR_TIMEOUT_SEC:-90}"
+# shellcheck disable=SC2034
 CUE_WINDOW_SEC="${PHASE6_CUE_WINDOW_SEC:-110}"
 LAND_NAV_STATE="${PX4_EXPECTED_LAND_NAV_STATE:-18}"
+# shellcheck disable=SC2034
 LAND_MIN_DELTA_Z="${PX4_EXPECTED_LAND_MIN_DELTA_Z:-10.0}"
 LAND_DETECTED_TIMEOUT_SEC="${PX4_LAND_DETECTED_TIMEOUT_SEC:-120}"
+# shellcheck disable=SC2034
 CATCH_MIN_ALTITUDE_M="${PHASE6_CATCH_MIN_ALTITUDE_M:-10.0}"
+# shellcheck disable=SC2034
 INITIAL_RANGE_MIN_M="${PHASE6_INITIAL_RANGE_MIN_M:-80.0}"
+# shellcheck disable=SC2034
 RANGE_REDUCTION_MIN_M="${PHASE6_RANGE_REDUCTION_MIN_M:-40.0}"
+# shellcheck disable=SC2034
 FINAL_RANGE_MAX_M="${PHASE6_FINAL_RANGE_MAX_M:-60.0}"
+# shellcheck disable=SC2034
 TAIL_ANGLE_MAX_DEG="${PHASE6_TAIL_ANGLE_MAX_DEG:-45.0}"
+# shellcheck disable=SC2034
 HEADING_ALIGNMENT_MAX_DEG="${PHASE6_HEADING_ALIGNMENT_MAX_DEG:-35.0}"
 PLANE2_ROUTE_POINT1_NORTH_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT1_NORTH_M:-120.0}"
 PLANE2_ROUTE_POINT1_EAST_M="${PHASE6_LIVE_RIVAL_STRAIGHT_POINT1_EAST_M:-0.0}"
@@ -784,13 +815,14 @@ done
 wait_for_compose_services 60
 
 echo "step 5: preparing PX4 message, control, competition, guidance, and vision packages"
+# shellcheck disable=SC2140
 ros2_exec "
   set -euo pipefail
   set +u
   source /opt/ros/humble/setup.bash
   set -u
   cd /workspaces/ros2_ws
-  if [[ "${COLD_BUILD}" == "1" ]]; then
+  if [[ ${COLD_BUILD} == 1 ]]; then
     rm -rf build install log
   fi
   mkdir -p /workspaces/ros2_ws/src
@@ -881,6 +913,17 @@ run_status_waiter "${PLANE1_NAMESPACE}" "${PLANE1_STATUS_TOPIC}" "${PLANE1_STATU
 echo "step 12: waiting for pursue state"
 wait_for_state pursue 90
 
+echo "step 12b: starting the visual tracking geometry monitor"
+ros2_exec "set -euo pipefail; set +u; source /opt/ros/humble/setup.bash; source /workspaces/ros2_ws/install/setup.bash; set -u; /workspaces/ros2_ws/install/bin/cue_geometry_monitor --ros-args -p use_sim_time:=true -p publish_period_sec:=0.2 -p output_csv:='${CONTAINER_CSV_PATH}'" >"${MONITOR_LOG}" 2>&1 &
+MONITOR_PID=$!
+
+sleep 2
+if ! kill -0 "${MONITOR_PID}" >/dev/null 2>&1; then
+  echo "geometry monitor failed to start" >&2
+  cat "${MONITOR_LOG}" >&2 || true
+  exit 207
+fi
+
 echo "step 13: confirming cueing bridge emits PX4 attitude offboard setpoints"
 for ((i = 1; i <= 30; i++)); do
   if grep -q 'published trailing-slot cueing setpoint' "${CUEING_LOG}"; then
@@ -914,6 +957,8 @@ fi
 RIVAL_ROUTE_PID=""
 
 echo "step 17: landing both aircraft"
+stop_pid "${MONITOR_PID}"
+MONITOR_PID=""
 stop_pid "${CUEING_PID}"
 CUEING_PID=""
 stop_pid "${STATE_MACHINE_PID}"
@@ -939,5 +984,12 @@ SYMBOLOGY_PID=""
 run_land_sequence "${PLANE1_NAMESPACE}" "${PLANE1_COMMAND_TOPIC}" "${PLANE1_ACK_TOPIC}" "${PLANE1_GLOBAL_POSITION_TOPIC}" "${PLANE1_SYS_ID}" "${PLANE1_LAND_LOG}" "${PLANE1_STATUS_LOG}" "${PLANE1_LAND_DETECTED_LOG}"
 run_land_sequence "${PLANE2_NAMESPACE}" "${PLANE2_COMMAND_TOPIC}" "${PLANE2_ACK_TOPIC}" "${PLANE2_GLOBAL_POSITION_TOPIC}" "${PLANE2_SYS_ID}" "${PLANE2_LAND_LOG}" "${PLANE2_STATUS_LOG}" "${PLANE2_LAND_DETECTED_LOG}"
 
+mkdir -p "${MISSION_EVIDENCE_DIR}"
+"${COMPOSE_CMD[@]}" "${COMPOSE_ARGS[@]}" cp "ros2_app:${CONTAINER_CSV_PATH}" "${CSV_PATH}"
+cp "${CSV_PATH}" "${MISSION_EVIDENCE_CSV}"
+python3 "${ROOT_DIR}/scripts/export-phase6-czml.py" "${MISSION_EVIDENCE_CSV}" -o "${MISSION_EVIDENCE_CZML}"
+
 echo "phase-7 mission profile succeeded"
 echo "visual lock summary: ${LOCK_SUMMARY}"
+echo "mission csv: ${MISSION_EVIDENCE_CSV}"
+echo "mission czml: ${MISSION_EVIDENCE_CZML}"
