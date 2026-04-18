@@ -9,6 +9,8 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import CameraInfo
 from visualization_msgs.msg import Marker, MarkerArray
+import tf2_ros
+from tf2_geometry_msgs import do_transform_pose
 
 from .position_estimator_constants import RIVAL_HEIGHT_M, RIVAL_WINGSPAN_M
 
@@ -31,6 +33,8 @@ class PositionEstimator(Node):
 
         self.camera_info_msg: CameraInfo | None = None
         self.ownship_pose_msg: PoseStamped | None = None
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         self._warning_count = 0
         self._warn_interval = 30
@@ -84,6 +88,14 @@ class PositionEstimator(Node):
             return
         if self.ownship_pose_msg is None:
             self._warn_bounded("dropping detections: no ownship pose yet")
+            return
+        if not self.tf_buffer.can_transform(
+            "world",
+            self.camera_info_msg.header.frame_id,
+            rclpy.time.Time(),
+            timeout=rclpy.duration.Duration(seconds=0.5),
+        ):
+            self._warn_bounded("dropping detections: TF world frame not available yet")
             return
 
         measurement = self._extract_bbox_measurement(msg)
@@ -171,14 +183,25 @@ class PositionEstimator(Node):
         lateral_m = (center_u - cx) * depth_m / fx
         vertical_m = (center_v - cy) * depth_m / fy
 
-        pose_msg = PoseStamped()
-        pose_msg.header.frame_id = "world"
-        pose_msg.header.stamp = out_stamp if self._stamp_is_set(out_stamp) else self.get_clock().now().to_msg()
-        pose_msg.pose.position.x = ownship_pose.pose.position.x + depth_m
-        pose_msg.pose.position.y = ownship_pose.pose.position.y + lateral_m
-        pose_msg.pose.position.z = ownship_pose.pose.position.z + vertical_m
-        pose_msg.pose.orientation.w = 1.0
-        return pose_msg
+        camera_pose = PoseStamped()
+        camera_pose.header.frame_id = camera_info.header.frame_id
+        camera_pose.header.stamp = out_stamp if self._stamp_is_set(out_stamp) else self.get_clock().now().to_msg()
+        camera_pose.pose.position.x = depth_m
+        camera_pose.pose.position.y = lateral_m
+        camera_pose.pose.position.z = vertical_m
+        camera_pose.pose.orientation.w = 1.0
+
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                "world",
+                camera_info.header.frame_id,
+                rclpy.time.Time()
+            )
+            world_pose = do_transform_pose(camera_pose, transform)
+            return world_pose
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            self._warn_bounded(f"TF lookup failed: {e}")
+            return None
 
     def _extract_bbox_measurement(
         self, marker_array: MarkerArray
