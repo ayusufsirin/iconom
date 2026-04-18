@@ -3,6 +3,7 @@ from __future__ import annotations
 
 # pyright: reportAny=false, reportExplicitAny=false, reportMissingImports=false, reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportUnusedFunction=false, reportUnannotatedClassAttribute=false, reportPossiblyUnboundVariable=false, reportMissingTypeArgument=false, reportUnusedImport=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportAttributeAccessIssue=false, reportImplicitStringConcatenation=false, reportUntypedBaseClass=false, reportUnusedCallResult=false, reportUnusedParameter=false
 
+import math
 import rclpy
 from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
@@ -95,8 +96,7 @@ class PositionEstimator(Node):
             rclpy.time.Time(),
             timeout=rclpy.duration.Duration(seconds=0.5),
         ):
-            self._warn_bounded("dropping detections: TF world frame not available yet")
-            return
+            self._warn_bounded("TF world frame not available yet; using quaternion fallback")
 
         measurement = self._extract_bbox_measurement(msg)
         if measurement is None:
@@ -201,7 +201,33 @@ class PositionEstimator(Node):
             return world_pose
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             self._warn_bounded(f"TF lookup failed: {e}")
-            return None
+
+        yaw = self._quaternion_to_yaw(ownship_pose.pose.orientation)
+        wx, wy = self._rotate_by_yaw(depth_m, lateral_m, yaw)
+
+        pose_msg = PoseStamped()
+        pose_msg.header.frame_id = "world"
+        pose_msg.header.stamp = out_stamp if self._stamp_is_set(out_stamp) else self.get_clock().now().to_msg()
+        pose_msg.pose.position.x = ownship_pose.pose.position.x + wx
+        pose_msg.pose.position.y = ownship_pose.pose.position.y + wy
+        pose_msg.pose.position.z = ownship_pose.pose.position.z + vertical_m
+        pose_msg.pose.orientation.w = 1.0
+        return pose_msg
+
+    def _quaternion_to_yaw(self, orientation) -> float:
+        x = orientation.x
+        y = orientation.y
+        z = orientation.z
+        w = orientation.w
+
+        siny_cosp = 2.0 * (w * z + x * y)
+        cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+        return math.atan2(siny_cosp, cosy_cosp)
+
+    def _rotate_by_yaw(self, forward: float, lateral: float, yaw: float) -> tuple[float, float]:
+        wx = forward * math.cos(yaw) - lateral * math.sin(yaw)
+        wy = forward * math.sin(yaw) + lateral * math.cos(yaw)
+        return wx, wy
 
     def _extract_bbox_measurement(
         self, marker_array: MarkerArray
