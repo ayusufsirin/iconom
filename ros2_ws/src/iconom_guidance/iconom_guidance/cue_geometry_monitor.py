@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# pyright: reportMissingImports=false, reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnannotatedClassAttribute=false, reportUntypedBaseClass=false, reportImplicitStringConcatenation=false, reportIndexIssue=false, reportUnusedCallResult=false, reportMissingParameterType=false
+from __future__ import annotations
+
 import csv
 import math
 from pathlib import Path
@@ -13,6 +16,8 @@ from .phase6_time import now_sec
 
 OWNSHIP_STATE_TOPIC = "/competition/ownship/state"
 RIVAL_STATE_TOPIC = "/competition/rival/state"
+FUSED_STATE_TOPIC = "/fusion/rival/state"
+VISUAL_POSE_TOPIC = "/vision/rival_pose"
 SELECTED_TARGET_TOPIC = "/guidance/selected_target"
 INTERCEPT_TARGET_TOPIC = "/guidance/intercept_target"
 CUE_ERROR_TOPIC = "/guidance/camera_cue_error_deg"
@@ -49,6 +54,10 @@ class CueGeometryMonitor(Node):
 
         self.ownship_state: Optional[PoseStamped] = None
         self.rival_state: Optional[PoseStamped] = None
+        self.fused_state: Optional[PoseStamped] = None
+        self.fused_state_at: Optional[float] = None
+        self.visual_state: Optional[PoseStamped] = None
+        self.visual_state_at: Optional[float] = None
         self.selected_target: Optional[PoseStamped] = None
         self.intercept_target: Optional[PoseStamped] = None
         self.selected_target_at: Optional[float] = None
@@ -93,6 +102,18 @@ class CueGeometryMonitor(Node):
                 "longitudinal_phase",
                 "spacing_mode",
                 "in_forward_cone",
+                "fused_x",
+                "fused_y",
+                "fused_z",
+                "fused_yaw_deg",
+                "fused_age_sec",
+                "visual_x",
+                "visual_y",
+                "visual_z",
+                "visual_yaw_deg",
+                "visual_age_sec",
+                "referee_fused_gap_m",
+                "referee_visual_gap_m",
             ]
         )
         self.csv_file.flush()
@@ -100,6 +121,8 @@ class CueGeometryMonitor(Node):
         self.bearing_error_pub = self.create_publisher(Float32, BEARING_ERROR_TOPIC, 10)
         self.create_subscription(PoseStamped, OWNSHIP_STATE_TOPIC, self._handle_ownship, 10)
         self.create_subscription(PoseStamped, RIVAL_STATE_TOPIC, self._handle_rival, 10)
+        self.create_subscription(PoseStamped, FUSED_STATE_TOPIC, self._handle_fused_state, 10)
+        self.create_subscription(PoseStamped, VISUAL_POSE_TOPIC, self._handle_visual_state, 10)
         self.create_subscription(PoseStamped, SELECTED_TARGET_TOPIC, self._handle_selected_target, 10)
         self.create_subscription(PoseStamped, INTERCEPT_TARGET_TOPIC, self._handle_intercept_target, 10)
         self.create_subscription(Float32, CUE_ERROR_TOPIC, self._handle_cue_error, 10)
@@ -117,6 +140,14 @@ class CueGeometryMonitor(Node):
 
     def _handle_rival(self, msg: PoseStamped) -> None:
         self.rival_state = msg
+
+    def _handle_fused_state(self, msg: PoseStamped) -> None:
+        self.fused_state = msg
+        self.fused_state_at = now_sec(self)
+
+    def _handle_visual_state(self, msg: PoseStamped) -> None:
+        self.visual_state = msg
+        self.visual_state_at = now_sec(self)
 
     def _handle_selected_target(self, msg: PoseStamped) -> None:
         self.selected_target = msg
@@ -159,6 +190,14 @@ class CueGeometryMonitor(Node):
         dz = float(self.rival_state.pose.position.z - msg.pose.position.z)
         return math.sqrt(dx * dx + dy * dy + dz * dz)
 
+    def _gap_between_poses(self, pose_a: Optional[PoseStamped], pose_b: Optional[PoseStamped]) -> float:
+        if pose_a is None or pose_b is None:
+            return float("nan")
+        dx = float(pose_a.pose.position.x - pose_b.pose.position.x)
+        dy = float(pose_a.pose.position.y - pose_b.pose.position.y)
+        dz = float(pose_a.pose.position.z - pose_b.pose.position.z)
+        return math.sqrt(dx * dx + dy * dy + dz * dz)
+
     def _tick(self) -> None:
         if self.ownship_state is None or self.rival_state is None:
             return
@@ -197,6 +236,14 @@ class CueGeometryMonitor(Node):
         )
         rival_selected_gap_m = self._gap_to_rival_m(self.selected_target)
         rival_intercept_gap_m = self._gap_to_rival_m(self.intercept_target)
+        fused_x, fused_y, fused_z, fused_yaw_deg, fused_age_sec = self._pose_fields(
+            self.fused_state, self.fused_state_at, now
+        )
+        visual_x, visual_y, visual_z, visual_yaw_deg, visual_age_sec = self._pose_fields(
+            self.visual_state, self.visual_state_at, now
+        )
+        referee_fused_gap_m = self._gap_between_poses(self.rival_state, self.fused_state)
+        referee_visual_gap_m = self._gap_between_poses(self.rival_state, self.visual_state)
 
         bearing_msg = Float32()
         bearing_msg.data = float(bearing_error_deg)
@@ -233,6 +280,18 @@ class CueGeometryMonitor(Node):
                 self.longitudinal_phase,
                 self.spacing_mode,
                 str(in_forward_cone),
+                format_float(fused_x),
+                format_float(fused_y),
+                format_float(fused_z),
+                format_float(fused_yaw_deg),
+                format_float(fused_age_sec),
+                format_float(visual_x),
+                format_float(visual_y),
+                format_float(visual_z),
+                format_float(visual_yaw_deg),
+                format_float(visual_age_sec),
+                format_float(referee_fused_gap_m),
+                format_float(referee_visual_gap_m),
             ]
         )
         self.csv_file.flush()

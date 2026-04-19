@@ -31,7 +31,11 @@ class AircraftDetector(Node):
 
         self._frame_count = 0
         self._empty_count = 0
+        self._low_confidence_count = 0
         self._log_interval = 30
+
+        self.declare_parameter("min_confidence", 0.25)
+        self._min_confidence = float(self.get_parameter("min_confidence").value)
 
         self._allowed_labels = self._resolve_allowed_labels()
 
@@ -46,7 +50,8 @@ class AircraftDetector(Node):
         self.get_logger().info(
             f"aircraft_detector started: subscribing to {IMAGE_TOPIC}; "
             f"publishing to {DETECTIONS_TOPIC}; model={MODEL_PATH}; "
-            f"device={_device}; allowed_classes={sorted(self._allowed_labels)}"
+            f"device={_device}; allowed_classes={sorted(self._allowed_labels)}; "
+            f"min_confidence={self._min_confidence:.2f}"
         )
 
     def _resolve_allowed_labels(self) -> set[str]:
@@ -107,13 +112,27 @@ class AircraftDetector(Node):
                 boxes_xyxy = boxes.xyxy.cpu().numpy()
                 class_ids = boxes.cls.cpu().numpy().astype(int)
                 confidences = boxes.conf.cpu().numpy() if boxes.conf is not None else None
+                rejected_low_confidence = []
                 for idx, coords in enumerate(boxes_xyxy):
                     class_id = class_ids[idx]
                     label = self._label_for_class(class_id)
                     if label not in self._allowed_labels:
                         continue
                     confidence = float(confidences[idx]) if confidences is not None else 0.0
+                    if confidence < self._min_confidence:
+                        self._low_confidence_count += 1
+                        rejected_low_confidence.append(
+                            f"{label}:{confidence:.2f}< {self._min_confidence:.2f}"
+                        )
+                        continue
                     detections.append((coords, label, confidence))
+
+                if rejected_low_confidence and self._frame_count % self._log_interval == 0:
+                    self.get_logger().debug(
+                        "rejected low-confidence detections: "
+                        f"{len(rejected_low_confidence)} in frame {self._frame_count}; "
+                        + ", ".join(rejected_low_confidence)
+                    )
 
         if not detections:
             self._empty_count += 1

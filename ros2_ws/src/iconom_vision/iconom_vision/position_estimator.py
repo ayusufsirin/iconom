@@ -180,7 +180,8 @@ class PositionEstimator(Node):
         if fx <= 0.0 or fy <= 0.0:
             return None
 
-        lateral_m = (center_u - cx) * depth_m / fx
+        # Mapping D: Swap + invert
+        lateral_m = -(center_u - cx) * depth_m / fx
         vertical_m = (center_v - cy) * depth_m / fy
 
         camera_pose = PoseStamped()
@@ -203,6 +204,7 @@ class PositionEstimator(Node):
             self._warn_bounded(f"TF lookup failed: {e}")
 
         yaw = self._quaternion_to_yaw(ownship_pose.pose.orientation)
+        # Fixed: _rotate_by_yaw expects (forward, lateral), not (lateral, forward)
         wx, wy = self._rotate_by_yaw(depth_m, lateral_m, yaw)
 
         pose_msg = PoseStamped()
