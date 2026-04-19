@@ -58,7 +58,7 @@ class AircraftDetector(Node):
         )
 
     def _resolve_allowed_labels(self) -> set[str]:
-        allowed = {"person"}
+        allowed = set()
         model_labels = self._model_label_names()
         if "airplane" in model_labels:
             allowed.add("airplane")
