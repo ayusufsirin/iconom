@@ -209,3 +209,27 @@ services:
         condition: service_started
     command: ["/usr/local/bin/ros-gz-bridge-entrypoint.sh"]
     restart: "no"
+
+  detector:
+    profiles: ["symbology"]
+    build:
+      context: .
+      dockerfile: docker/detector/Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      ROS_DISTRO: ${ROS_DISTRO:-humble}
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    depends_on:
+      xrce_agent:
+        condition: service_started
+    volumes:
+      - ./ros2_ws:/workspaces/ros2_ws
+    restart: "no"
