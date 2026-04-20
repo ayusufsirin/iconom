@@ -107,7 +107,7 @@ class CameraCueingBridge(Node):
         self.declare_parameter("target_propagation_max_sec", 1.0)
         self.declare_parameter("capture_error_deg", 20.0)
         self.declare_parameter("near_roll_scale", 0.35)
-        self.declare_parameter("use_fused_input", False)
+        self.declare_parameter("use_fused_input", True)
         self.declare_parameter("fused_state_topic", "/fusion/rival/state")
 
         namespace = str(self.get_parameter("vehicle_namespace").value)

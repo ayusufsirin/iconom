@@ -1,0 +1,14 @@
+grep evidence from docs/phase-7-plan.md
+
+**Evidence bundle**:
+A complete Phase 7 acceptance bundle must contain:
+- Headless run: raw logs + CSV/JSON metrics + topic-rate evidence (min. 3 files)
+- GUI run: at least 1 screenshot or video artifact
+- Naming convention: `task-final-phase7-harness-*`
+
+**GUI-observable acceptance**:
+- Reverse-projected baseline overlay and visual/fused outputs are observable simultaneously
+- Screenshot or recording artifact confirms rival is present in scene and overlays are rendering
+
+**Headless mode acceptance**:
+- Raw logs, aligned metrics (coverage %, timestamp skew, image-plane center error, bearing error, 3D RMSE), and topic-rate evidence are produced as artifacts
